@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AMPARA
 
-## Getting Started
+Painel operacional (Next.js 15) para monitoramento de medidas protetivas com tornozeleira eletrônica.
 
-First, run the development server:
+- Homologação (intranet): `https://ampara-h.ssp.go.gov.br`
+- Produção (DNS definitivo ainda não publicado): `https://ampara.ssp.go.gov.br`
+
+## Stack
+
+- Next.js 15 (App Router)
+- Tailwind CSS + shadcn/ui
+- Prisma + PostgreSQL
+- SSO SSP-GO (`token_only`, `client_id=ampara`)
+- RBAC: `ADMIN` | `POLICE`
+
+## Pareamento QR
+
+1. Medida em `AWAITING_PAIRING` → **Gerar QR de pareamento** no detalhe
+2. Token opaco retornado **uma vez**; só o hash fica no banco (TTL ~5 min)
+3. App (`mulhersegura://pair?token=...`) ou `/pair?token=...` chama `POST /api/v1/pairing/redeem`
+4. Device criado, tokens pendentes/anteriores revogados, medida → `ACTIVE`
+
+## Localização do monitorado
+
+- Medida em simulação: posição mock no painel
+- Medida real (`isSimulation=false`): mapa do Guardião (`src/config/guardiao.ts`)
+
+## Autenticação SSO
+
+1. `/login` → `{SSOWS}auth?response_type=token_only&client_id=ampara&redirect_uri=/auth/callback`
+2. SSO devolve `access_token`
+3. `POST /api/auth/sso/session` valida em `{SSOWS}validate` e grava cookie `ms_session`
+4. Homologação usa `https://ssows-h.ssp.go.gov.br/` (hostname `ampara-h.ssp.go.gov.br`)
+
+Cadastrar no SSO o client `ampara` com redirect `https://ampara-h.ssp.go.gov.br/auth/callback`.
+
+## Setup local
 
 ```bash
+cp .env.example .env
+npm install
+npx prisma generate
+npx prisma migrate dev
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Login sem IdP: `/dev-login` (somente `next dev`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variáveis (.env)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Só o banco e o segredo da sessão. Domínio, SSO e URLs do Guardião estão no código.
 
-## Learn More
+| Variável | Uso |
+|----------|-----|
+| `DATABASE_URL` | PostgreSQL |
+| `AUTH_SECRET` | Assinatura HMAC do cookie `ms_session` (mín. 32 caracteres) |
 
-To learn more about Next.js, take a look at the following resources:
+Homologação (K8s):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```text
+DATABASE_URL=postgresql://usr_ampara:SENHA@postgres-homo.ssp.go.gov.br:5432/ampara?schema=public&sslmode=require
+AUTH_SECRET=<openssl rand -base64 32>
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Aplicar schema no banco vazio: `npm run db:deploy`.
 
-## Deploy on Vercel
+## Deploy (K8s)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+docker build -t ampara .
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A imagem escuta na porta 3000 (`output: "standalone"`). Rodar `npm run db:deploy` contra o banco de homo antes ou no job de migrate.
+
+## Rotas
+
+- `/login` — redirect SSO
+- `/auth/callback` — retorno do SSO
+- `/dev-login` — mock local
+- `/` — dashboard
+- `/pair` — redeem web
+- `/api/auth/sso/session` — cria sessão
+- `/api/v1/pairing/redeem` — redeem público

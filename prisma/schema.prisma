@@ -1,0 +1,326 @@
+// Mulher Segura — Schema Prisma (MVP)
+// Auth tables alinhadas ao Better Auth + domínio de medidas protetivas
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  POLICE
+}
+
+enum ProtectionOrderStatus {
+  DRAFT
+  AWAITING_PAIRING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum PairingTokenStatus {
+  PENDING
+  REDEEMED
+  EXPIRED
+  REVOKED
+}
+
+enum DeviceStatus {
+  ACTIVE
+  REVOKED
+  LOST
+}
+
+enum AlertStatus {
+  OPEN
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+enum GeofenceState {
+  SAFE
+  PENDING_VIOLATION
+  VIOLATING
+  PENDING_SAFE
+}
+
+enum AuditAction {
+  USER_LOGIN
+  USER_LOGOUT
+  VICTIM_CREATED
+  VICTIM_UPDATED
+  INMATE_CREATED
+  INMATE_UPDATED
+  PROTECTION_ORDER_CREATED
+  PROTECTION_ORDER_UPDATED
+  PROTECTION_ORDER_STATUS_CHANGED
+  PAIRING_TOKEN_GENERATED
+  PAIRING_TOKEN_REDEEMED
+  PAIRING_TOKEN_REVOKED
+  DEVICE_REVOKED
+  PROXIMITY_CHECKED
+  ALERT_OPENED
+  ALERT_REFRESHED
+  ALERT_RESOLVED
+  EXTERNAL_API_ERROR
+  EMERGENCY_TRIGGERED
+}
+
+// ─────────────────────────────────────────────
+// Better Auth
+// ─────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  role     UserRole @default(POLICE)
+  isActive Boolean  @default(true)
+
+  sessions Session[]
+  accounts Account[]
+
+  createdVictims          Victim[]          @relation("VictimCreatedBy")
+  createdInmates          Inmate[]          @relation("InmateCreatedBy")
+  createdProtectionOrders ProtectionOrder[] @relation("OrderCreatedBy")
+  auditLogs               AuditLog[]        @relation("AuditActor")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────
+// Domínio
+// ─────────────────────────────────────────────
+
+model Victim {
+  id          String   @id @default(cuid())
+  publicId    String   @unique @default(cuid())
+  fullName    String
+  phone       String?
+  document    String?
+  notes       String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy        User              @relation("VictimCreatedBy", fields: [createdById], references: [id])
+  protectionOrders ProtectionOrder[]
+
+  @@index([createdById])
+  @@map("victim")
+}
+
+model Inmate {
+  id               String   @id @default(cuid())
+  publicId         String   @unique @default(cuid())
+  fullName         String
+  externalInmateId String   @unique
+  document         String?
+  notes            String?
+  createdById      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  createdBy        User              @relation("InmateCreatedBy", fields: [createdById], references: [id])
+  protectionOrders ProtectionOrder[]
+
+  @@index([externalInmateId])
+  @@index([createdById])
+  @@map("inmate")
+}
+
+model ProtectionOrder {
+  id            String                @id @default(cuid())
+  publicId      String                @unique @default(cuid())
+  victimId      String
+  inmateId      String
+  radiusMeters  Int
+  status        ProtectionOrderStatus @default(DRAFT)
+  /// true = mock/simulador; false = posição real no Guardião (pessoa_ident = ID da tornozeleira).
+  isSimulation  Boolean               @default(true)
+  /// Nº do processo judicial — único quando informado (NULL permitido).
+  judicialRef   String?               @unique
+  startsAt      DateTime?
+  endsAt        DateTime?
+  geofenceState GeofenceState         @default(SAFE)
+  pendingCount  Int                   @default(0)
+  lastCheckAt   DateTime?
+  lastDistanceM Float?
+  createdById   String
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  victim          Victim           @relation(fields: [victimId], references: [id])
+  inmate          Inmate           @relation(fields: [inmateId], references: [id])
+  createdBy       User             @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  pairingTokens   PairingToken[]
+  devices         Device[]
+  victimLocations VictimLocation[]
+  alerts          Alert[]
+
+  @@index([status])
+  @@index([victimId])
+  @@index([inmateId])
+  @@index([createdById])
+  @@map("protection_order")
+}
+
+model PairingToken {
+  id                String             @id @default(cuid())
+  protectionOrderId String
+  tokenHash         String             @unique
+  status            PairingTokenStatus @default(PENDING)
+  expiresAt         DateTime
+  redeemedAt        DateTime?
+  createdById       String?
+  createdAt         DateTime           @default(now())
+
+  protectionOrder ProtectionOrder @relation(fields: [protectionOrderId], references: [id])
+
+  @@index([protectionOrderId, status])
+  @@index([expiresAt])
+  @@map("pairing_token")
+}
+
+model Device {
+  id                String       @id @default(cuid())
+  publicId          String       @unique @default(cuid())
+  protectionOrderId String
+  status            DeviceStatus @default(ACTIVE)
+  platform          String
+  deviceBrand       String?
+  deviceModel       String?
+  pushToken         String?
+  deviceTokenHash   String       @unique
+  appVersion        String?
+  lastSeenAt        DateTime?
+  pairedAt          DateTime     @default(now())
+  revokedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  protectionOrder ProtectionOrder @relation(fields: [protectionOrderId], references: [id])
+
+  @@index([protectionOrderId, status])
+  @@map("device")
+}
+
+model VictimLocation {
+  id                String   @id @default(cuid())
+  protectionOrderId String
+  latitude          Float
+  longitude         Float
+  accuracyMeters    Float?
+  recordedAt        DateTime
+  receivedAt        DateTime @default(now())
+  source            String   @default("APP")
+
+  protectionOrder ProtectionOrder @relation(fields: [protectionOrderId], references: [id])
+
+  @@index([protectionOrderId, recordedAt])
+  @@map("victim_location")
+}
+
+model Alert {
+  id                 String      @id @default(cuid())
+  publicId           String      @unique @default(cuid())
+  protectionOrderId  String
+  status             AlertStatus @default(OPEN)
+  openedAt           DateTime    @default(now())
+  resolvedAt         DateTime?
+  triggerDistanceM   Float
+  lastDistanceM      Float
+  inmateLatitude     Float
+  inmateLongitude    Float
+  victimLatitude     Float
+  victimLongitude    Float
+  externalTimestamp  DateTime?
+  consecutiveHits    Int         @default(2)
+  notificationSentAt DateTime?
+  lastRealtimeAt     DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  protectionOrder ProtectionOrder @relation(fields: [protectionOrderId], references: [id])
+
+  @@index([protectionOrderId, status])
+  @@index([openedAt])
+  @@map("alert")
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  actorUserId String?
+  actorType   String
+  action      AuditAction
+  entityType  String
+  entityId    String?
+  ip          String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+
+  actorUser User? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}
