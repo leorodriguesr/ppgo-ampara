@@ -1,0 +1,172 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: ampara-deployment
+
+spec:
+  replicas: {{QTD_REPLICAS}}
+
+  selector:
+    matchLabels:
+      app: ampara-pod
+
+  template:
+    metadata:
+      labels:
+        app: ampara-pod
+        jobid: "{{JOB_ID}}"
+
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
+      imagePullSecrets:
+        - name: docker-registry-ssp
+
+      # Roda prisma migrate deploy antes da aplicação. Se falhar, o pod
+      # não sobe e a versão anterior continua no ar.
+      initContainers:
+        - name: ampara-migrate
+
+          image: docker.ssp.go.gov.br/ssp/ampara:{{COMMIT_ID}}-migrate
+
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+
+          env:
+            - name: BANCO
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: BANCO
+            - name: NOME
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: NOME
+            - name: USUARIO
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: USUARIO
+            - name: SENHA
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: SENHA
+
+      containers:
+        - name: ampara-container
+
+          image: docker.ssp.go.gov.br/ssp/ampara:{{COMMIT_ID}}
+
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+
+            limits:
+              cpu: "{{QTD_CPU}}"
+              memory: "{{QTD_MEMORIA}}"
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          env:
+            - name: PORT
+              value: "8080"
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: AUTH_SECRET
+            - name: BANCO
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: BANCO
+            - name: NOME
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: NOME
+            - name: USUARIO
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: USUARIO
+            - name: SENHA
+              valueFrom:
+                secretKeyRef:
+                  name: secret-ampara
+                  key: SENHA
+
+          envFrom:
+            - secretRef:
+                name: config-secret
+
+            - configMapRef:
+                name: config-global
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst

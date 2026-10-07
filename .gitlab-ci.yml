@@ -1,0 +1,172 @@
+variables:
+  APP_NAME: ampara
+  IMAGE_TAG: "$CI_REGISTRY/ssp/$APP_NAME:$CI_COMMIT_SHORT_SHA"
+  DOCKER_DRIVER: overlay2
+
+stages:
+  - docker
+  - homo
+  - prod
+#  - prod-nsx
+
+# ---------------------------------------------------------------------------
+# Build e Push da imagem Docker
+# ---------------------------------------------------------------------------
+
+docker:
+  image: docker:24.0.7
+  stage: docker
+
+  services:
+    - name: docker:24.0.7-dind
+      alias: docker
+
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+
+  script:
+    - |
+      echo "$CI_REGISTRY_PASSWORD" |
+      docker login \
+        --username "$CI_REGISTRY_USER" \
+        --password-stdin \
+        "$CI_REGISTRY"
+
+    - docker build --tag "$IMAGE_TAG" .
+    - docker push "$IMAGE_TAG"
+
+    # Imagem das migrations, usada pelo initContainer do deployment.
+    - docker build --target migrator --tag "$IMAGE_TAG-migrate" .
+    - docker push "$IMAGE_TAG-migrate"
+
+# ---------------------------------------------------------------------------
+# Deploy em Homologacao
+# ---------------------------------------------------------------------------
+
+homo:
+  image: dtzar/helm-kubectl
+  stage: homo
+
+  environment:
+    name: homologacao
+
+  resource_group: homologacao
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+
+    - if: '$CI_COMMIT_BRANCH'
+      when: manual
+
+  script:
+    - export KUBE_CONFIG="$KUBE_CONFIG_HOMO"
+    - export QTD_REPLICAS="1"
+    - export QTD_CPU="1"
+    - export QTD_MEMORIA="1Gi"
+    - deploy
+
+# ---------------------------------------------------------------------------
+# Deploy em Producao
+# ---------------------------------------------------------------------------
+
+prod:
+  image: dtzar/helm-kubectl
+  stage: prod
+
+  environment:
+    name: producao
+
+  resource_group: producao
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: true
+
+    - when: never
+
+  script:
+    - export KUBE_CONFIG="$KUBE_CONFIG_PROD"
+    - export QTD_REPLICAS="1"
+    - export QTD_CPU="2"
+    - export QTD_MEMORIA="4Gi"
+    - deploy
+
+# ---------------------------------------------------------------------------
+# Deploy em Producao — NSX
+# ---------------------------------------------------------------------------
+
+#prod-nsx:
+#  image: dtzar/helm-kubectl
+#  stage: prod-nsx
+#
+#  environment:
+#    name: producao-nsx
+#
+#  resource_group: producao-nsx
+#
+#  rules:
+#    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#      when: manual
+#      allow_failure: true
+#
+#    - when: never
+#
+#  script:
+#    - export KUBE_CONFIG="$NSX_KUBE_CONFIG_PROD"
+#    - export QTD_REPLICAS="1"
+#    - export QTD_CPU="2"
+#    - export QTD_MEMORIA="4Gi"
+#    - deploy
+
+# ---------------------------------------------------------------------------
+# Funcoes customizadas
+# ---------------------------------------------------------------------------
+
+.functions: &functions |
+  function deploy() {
+    mkdir -p ~/.kube
+
+    printf '%s' "$KUBE_CONFIG" > ~/.kube/config
+    chmod 600 ~/.kube/config
+
+    sed -e "s/{{COMMIT_ID}}/$CI_COMMIT_SHORT_SHA/g" \
+        -e "s/{{JOB_ID}}/$CI_JOB_ID/g" \
+        -e "s/{{QTD_REPLICAS}}/$QTD_REPLICAS/g" \
+        -e "s/{{QTD_CPU}}/$QTD_CPU/g" \
+        -e "s/{{QTD_MEMORIA}}/$QTD_MEMORIA/g" \
+        ./kube/deployment.yaml > deployment-temp.yaml
+
+    echo "Deployment que será aplicado:"
+    cat deployment-temp.yaml
+
+    if grep -q "{{" deployment-temp.yaml; then
+      echo "ERRO: existem variáveis que não foram substituídas no deployment."
+      exit 1
+    fi
+
+    kubectl apply -f ./kube/service.yaml
+    kubectl apply -f ./kube/ingress.yaml
+    kubectl apply -f deployment-temp.yaml
+
+    kubectl rollout status \
+      deployment/${APP_NAME}-deployment \
+      --timeout=10m || (
+        echo "Falha no rollout. Exibindo detalhes do Deployment e dos Pods."
+
+        kubectl describe deployment/${APP_NAME}-deployment || true
+        kubectl describe pod -l jobid="$CI_JOB_ID" || true
+        kubectl logs \
+          --tail=10000 \
+          --all-containers=true \
+          -l jobid="$CI_JOB_ID" || true
+
+        exit 1
+      )
+  }
+
+before_script:
+  - *functions

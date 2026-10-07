@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+
+metadata:
+  name: ampara-ingress
+
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/server-alias: "ampara.ssp.go.gov.br"
+    nginx.ingress.kubernetes.io/proxy-body-size: "300m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
+
+spec:
+  tls:
+    - hosts:
+        - ampara-h.ssp.go.gov.br
+        - ampara.ssp.go.gov.br
+
+      secretName: certificado-ssp
+
+  rules:
+    - host: ampara-h.ssp.go.gov.br
+
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+
+            backend:
+              service:
+                name: ampara-service
+
+                port:
+                  number: 80

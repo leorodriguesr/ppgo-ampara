@@ -5,7 +5,7 @@ export const APP_NAME = "AMPARA";
  * Precisa estar cadastrado no SSO com redirect
  * https://ampara-h.ssp.go.gov.br/auth/callback
  */
-export const sistemaNameSSO = "ampara";
+export const sistemaNameSSO = "AMPARA";
 
 export const APP_HOSTS = {
   DESV: "localhost:3000",
