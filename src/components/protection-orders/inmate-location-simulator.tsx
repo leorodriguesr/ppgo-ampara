@@ -93,6 +93,8 @@ function stepDistance(id: TrajectoryStep, distances: SimulatorDistances) {
       return distances.near;
     case "ARRIVED":
       return distances.arrived;
+    default:
+      return distances.far;
   }
 }
 
