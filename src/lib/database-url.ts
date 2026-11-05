@@ -3,8 +3,8 @@ function encodeUserInfo(value: string) {
 }
 
 /**
- * Homologação injeta BANCO, NOME, USUARIO e SENHA.
- * O Prisma da aplicação lê DATABASE_URL.
+ * Desenvolvimento usa DATABASE_URL.
+ * Homologação e produção usam BANCO, NOME, USUARIO e SENHA.
  */
 export function resolveDatabaseUrl(
   env: NodeJS.ProcessEnv = process.env,
