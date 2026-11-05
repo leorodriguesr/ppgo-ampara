@@ -67,7 +67,7 @@ function useMapPadding() {
   return wide
     ? {
       topLeft: [24, 88] as [number, number],
-      bottomRight: [380, 36] as [number, number],
+      bottomRight: [356, 36] as [number, number],
     }
     : {
       topLeft: [16, 84] as [number, number],
@@ -224,7 +224,7 @@ export function OperationsBoard() {
       </div>
 
       {user ? (
-        <div className="absolute top-4 right-4 z-[500] flex items-center gap-2 md:right-[364px]">
+        <div className="absolute top-4 right-4 z-[500] flex items-center gap-2 md:right-[356px]">
           <ThemeToggle />
           <button
             type="button"
@@ -280,7 +280,7 @@ export function OperationsBoard() {
         </span>
       </div>
 
-      <aside className="absolute inset-x-3 bottom-3 z-[500] flex max-h-[42vh] flex-col rounded-lg bg-white/95 text-[#1B2A41] ring-1 ring-[#D8DEE6] backdrop-blur-sm md:inset-x-auto md:top-4 md:right-3 md:bottom-3 md:w-[340px] md:max-h-none dark:bg-[#262626]/95 dark:text-white dark:ring-white/12">
+      <aside className="absolute inset-x-3 bottom-3 z-[500] flex max-h-[42vh] flex-col rounded-lg bg-white/95 text-[#1B2A41] ring-1 ring-[#D8DEE6] backdrop-blur-sm md:inset-x-auto md:top-4 md:right-0 md:bottom-3 md:h-auto md:w-[340px] md:max-h-none md:rounded-l-lg md:rounded-r-none dark:bg-[#262626]/95 dark:text-white dark:ring-white/12">
         <div className="px-4 pt-4 pb-3">
           <h1 className="text-sm font-medium">Acompanhamento Geral</h1>
           <p className="mt-1.5 flex items-baseline justify-between text-xs text-[#6B7280] dark:text-white/45">

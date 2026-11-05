@@ -89,27 +89,23 @@ function lineTone(zone: PositionZone) {
     return {
       dot: "bg-[#C62828]",
       stem: "bg-[#C62828]/45",
-      ring: "ring-[#C62828]",
     };
   }
   if (zone === "WATCH") {
     return {
       dot: "bg-[#D97706]",
       stem: "bg-[#D97706]/50",
-      ring: "ring-[#D97706]",
     };
   }
   if (zone === "OUTSIDE") {
     return {
       dot: "bg-[#2E7D32]",
       stem: "bg-[#2E7D32]/40",
-      ring: "ring-[#2E7D32]",
     };
   }
   return {
     dot: "bg-[#1B2A41] dark:bg-white/80",
     stem: "bg-[#C5CDD6] dark:bg-white/25",
-    ring: "ring-[#1B2A41] dark:ring-white",
   };
 }
 
@@ -326,11 +322,11 @@ export function CaseMonitor({ orderId }: { orderId: string }) {
       >
         Voltar ao mapa
       </Link>
-      <div className="absolute top-4 right-4 z-[500] md:right-[404px]">
+      <div className="absolute top-4 right-4 z-[500] md:right-[396px]">
         <ThemeToggle />
       </div>
 
-      <aside className="absolute inset-x-3 bottom-3 z-[500] flex h-[58vh] flex-col overflow-hidden bg-white/95 text-[#1B2A41] ring-1 ring-[#D8DEE6] backdrop-blur-sm md:inset-x-auto md:top-3 md:right-3 md:bottom-3 md:h-auto md:w-[380px] dark:bg-[#262626]/95 dark:text-white dark:ring-white/12">
+      <aside className="absolute inset-x-3 bottom-3 z-[500] flex h-[58vh] flex-col overflow-hidden rounded-lg bg-white/95 text-[#1B2A41] ring-1 ring-[#D8DEE6] backdrop-blur-sm md:inset-x-auto md:top-4 md:right-0 md:bottom-3 md:h-auto md:w-[380px] md:rounded-l-lg md:rounded-r-none dark:bg-[#262626]/95 dark:text-white dark:ring-white/12">
         <div className="relative shrink-0 px-4 pt-4 pb-3">
           <span aria-hidden className={cn("absolute inset-y-0 left-0 w-0.5", bar)} />
           <div className="flex items-baseline justify-between gap-3">
@@ -455,7 +451,6 @@ export function CaseMonitor({ orderId }: { orderId: string }) {
                           className={cn(
                             "absolute top-1 left-0 size-2.5 rounded-full",
                             tone.dot,
-                            line.id === freshId && cn("ring-2 ring-offset-1", tone.ring),
                           )}
                         />
                         <p

@@ -452,13 +452,28 @@ export function trackingReportFilename(input: TrackingReportInput) {
 
 type Cursor = { page: PDFPage; y: number };
 
-function drawFooter(page: PDFPage, font: PDFFont, pageNumber: number, pageCount: number) {
-  page.drawText(winAnsi(`AMPARA · Página ${pageNumber} de ${pageCount}`), {
+function drawFooter(
+  page: PDFPage,
+  font: PDFFont,
+  pageNumber: number,
+  pageCount: number,
+  emitted: string,
+) {
+  const color = rgb(0.42, 0.45, 0.5);
+  page.drawText(winAnsi(`AMPARA · ${emitted}`), {
     x: MARGIN,
     y: 24,
     size: 8,
     font,
-    color: rgb(0.42, 0.45, 0.5),
+    color,
+  });
+  const pages = winAnsi(`Página ${pageNumber} de ${pageCount}`);
+  page.drawText(pages, {
+    x: PAGE_WIDTH - MARGIN - font.widthOfTextAtSize(pages, 8),
+    y: 24,
+    size: 8,
+    font,
+    color,
   });
 }
 
@@ -546,6 +561,21 @@ function drawLetterhead(
   });
 }
 
+function emissionLabel(date: Date) {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const pick = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `Emitido em ${pick("day")} de ${pick("month")} de ${pick("year")}, às ${pick("hour")}h${pick("minute")}.`;
+}
+
 export async function buildTrackingReportPdf(input: TrackingReportInput) {
   const episodes = violationNarratives(input.narrative);
   const sections = (episodes.length > 0 ? episodes : [input.narrative])
@@ -569,14 +599,7 @@ export async function buildTrackingReportPdf(input: TrackingReportInput) {
   const mapImages = await Promise.all(mapPngs.map((png) => pdf.embedPng(png)));
   const ppImage = await pdf.embedPng(ppBytes);
   const goImage = await pdf.embedJpg(goBytes);
-  const generatedAt = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
+  const emitted = emissionLabel(new Date());
 
   const contentWidth = PAGE_WIDTH - MARGIN * 2;
   const contentTop =
@@ -596,36 +619,56 @@ export async function buildTrackingReportPdf(input: TrackingReportInput) {
   };
 
   let cursor = addPage();
-  const title = "Relatório de percurso";
-  cursor.page.drawText(title, {
-    x: MARGIN,
+  const title = "Relatório de Violação";
+  const titleSize = 16;
+  const titleWidth = bold.widthOfTextAtSize(winAnsi(title), titleSize);
+  cursor.page.drawText(winAnsi(title), {
+    x: (PAGE_WIDTH - titleWidth) / 2,
     y: cursor.y - 16,
-    size: 16,
+    size: titleSize,
     font: bold,
     color: pdfColor("#1B2A41"),
   });
   cursor.y -= 34;
 
-  const headerLines = [
-    `Preso: ${input.order.inmateName}`,
-    `Vítima: ${input.order.victimName}`,
-    `Processo: ${input.order.judicialRef || "não informado"}`,
-    `Período: ${periodLabel(input.from, input.to)}`,
-    `Raio da medida: ${input.order.radiusMeters} m · Área de atenção: ${input.order.watchRadiusMeters} m`,
-    `Gerado em ${generatedAt}`,
+  const headerFields = [
+    { label: "Preso", value: input.order.inmateName },
+    { label: "Vítima", value: input.order.victimName },
+    { label: "Processo", value: input.order.judicialRef || "não informado" },
+    { label: "Período", value: periodLabel(input.from, input.to) },
+    { label: "Raio da medida", value: `${input.order.radiusMeters} m` },
+    { label: "Área de atenção", value: `${input.order.watchRadiusMeters} m` },
   ];
-  for (const line of headerLines) {
-    cursor.page.drawText(winAnsi(line), {
+  const valueX =
+    MARGIN +
+    18 +
+    Math.max(
+      ...headerFields.map((field) =>
+        bold.widthOfTextAtSize(winAnsi(`${field.label}:`), 10),
+      ),
+    );
+  for (const field of headerFields) {
+    const lines = wrapText(field.value, regular, 10, PAGE_WIDTH - MARGIN - valueX);
+    cursor.page.drawText(winAnsi(`${field.label}:`), {
       x: MARGIN,
       y: cursor.y - 11,
       size: 10,
-      font: regular,
+      font: bold,
       color: rgb(0.15, 0.17, 0.22),
     });
-    cursor.y -= 14;
+    lines.forEach((line, index) => {
+      cursor.page.drawText(line, {
+        x: valueX,
+        y: cursor.y - 11 - index * 13,
+        size: 10,
+        font: regular,
+        color: rgb(0.15, 0.17, 0.22),
+      });
+    });
+    cursor.y -= Math.max(1, lines.length) * 14;
   }
 
-  cursor.y -= 8;
+  cursor.y -= 18;
 
   for (let index = 0; index < sections.length; index += 1) {
     const stops = sections[index];
@@ -742,7 +785,7 @@ export async function buildTrackingReportPdf(input: TrackingReportInput) {
   }
 
   pages.forEach((page, index) => {
-    drawFooter(page, regular, index + 1, pages.length);
+    drawFooter(page, regular, index + 1, pages.length, emitted);
   });
 
   return pdf.save();

@@ -19,7 +19,7 @@ export function ThemeToggle({ variant = "icon" }: ThemeToggleProps) {
       <button
         type="button"
         onClick={toggleTheme}
-        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#1B2A41] dark:text-slate-300 dark:hover:bg-white/6 dark:hover:text-white"
+        className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#1B2A41] dark:text-slate-300 dark:hover:bg-white/6 dark:hover:text-white"
       >
         <span className="grid size-8 shrink-0 place-items-center rounded-md bg-[#FBF3D4] text-[#8A6A08] ring-1 ring-[#E3B106]/35 dark:bg-[#E3B106]/15 dark:text-[#F0D36A] dark:ring-[#E3B106]/30">
           {icon}
