@@ -310,26 +310,24 @@ async function renderMap(stops: ReportStop[]) {
 
   context.lineCap = "round";
   context.lineJoin = "round";
-  context.strokeStyle = VICTIM_COLOR;
-  context.globalAlpha = 0.85;
-  context.lineWidth = 4;
-  context.beginPath();
-  stops.forEach((stop, index) => {
-    const point = pixel(stop.victim);
-    if (index === 0) context.moveTo(point.x, point.y);
-    else context.lineTo(point.x, point.y);
-  });
-  context.stroke();
-
+  context.globalAlpha = 0.95;
+  context.lineWidth = 5;
   for (let index = 1; index < stops.length; index += 1) {
-    const from = pixel(stops[index - 1].inmate);
-    const to = pixel(stops[index].inmate);
-    context.globalAlpha = 0.95;
-    context.strokeStyle = zoneFill(stops[index].zone);
-    context.lineWidth = 5;
+    const zone = zoneFill(stops[index].zone);
+    const victimFrom = pixel(stops[index - 1].victim);
+    const victimTo = pixel(stops[index].victim);
+    context.strokeStyle = zone;
     context.beginPath();
-    context.moveTo(from.x, from.y);
-    context.lineTo(to.x, to.y);
+    context.moveTo(victimFrom.x, victimFrom.y);
+    context.lineTo(victimTo.x, victimTo.y);
+    context.stroke();
+
+    const inmateFrom = pixel(stops[index - 1].inmate);
+    const inmateTo = pixel(stops[index].inmate);
+    context.strokeStyle = zone;
+    context.beginPath();
+    context.moveTo(inmateFrom.x, inmateFrom.y);
+    context.lineTo(inmateTo.x, inmateTo.y);
     context.stroke();
   }
   context.globalAlpha = 1;
@@ -700,7 +698,7 @@ export async function buildTrackingReportPdf(input: TrackingReportInput) {
       { label: "Atenção", color: ZONE_COLOR.WATCH },
       { label: "Violação", color: ZONE_COLOR.VIOLATION },
       { label: "Fora da área", color: ZONE_COLOR.OUTSIDE },
-      { label: "Vítima", color: VICTIM_COLOR },
+      { label: "Círculo da vítima", color: VICTIM_COLOR },
     ];
     let legendX = MARGIN;
     for (const item of legend) {

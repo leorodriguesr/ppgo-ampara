@@ -11,6 +11,8 @@ type TrackPoint = {
   inmate: { latitude: number; longitude: number };
 };
 
+const VICTIM_DOT = "#2563EB";
+
 function pathColor(zone: TrackPoint["zone"]) {
   if (zone === "VIOLATION") return "#C62828";
   if (zone === "OUTSIDE") return "#6B7280";
@@ -125,7 +127,7 @@ export function TrackingMap({
             [previous.victim.latitude, previous.victim.longitude],
             [current.victim.latitude, current.victim.longitude],
           ],
-          { color: "#2563EB", weight: 2, opacity: 0.45 },
+          { color, weight: 3, opacity: 0.9 },
         ).addTo(layers);
       }
 
@@ -144,7 +146,7 @@ export function TrackingMap({
             className: "",
             iconSize: [14, 14],
             iconAnchor: [7, 7],
-            html: dot("#2563EB"),
+            html: dot(VICTIM_DOT),
           }),
         })
           .addTo(layers)
@@ -216,17 +218,13 @@ export function TrackingMap({
           className: "",
           iconSize: [14, 14],
           iconAnchor: [7, 7],
-          html: dot("#2563EB"),
+          html: dot(VICTIM_DOT),
         }),
       })
         .addTo(layers)
         .bindTooltip("Vítima", { direction: "top" });
       const partialInmate = L.polyline([], { weight: 3, opacity: 0.9 }).addTo(layers);
-      const partialVictim = L.polyline([], {
-        color: "#2563EB",
-        weight: 2,
-        opacity: 0.45,
-      }).addTo(layers);
+      const partialVictim = L.polyline([], { weight: 3, opacity: 0.9 }).addTo(layers);
 
       function drawDone(through: number) {
         done.clearLayers();
@@ -245,7 +243,7 @@ export function TrackingMap({
               [previous.victim.latitude, previous.victim.longitude],
               [current.victim.latitude, current.victim.longitude],
             ],
-            { color: "#2563EB", weight: 2, opacity: 0.45 },
+            { color: pathColor(current.zone), weight: 3, opacity: 0.9 },
           ).addTo(done);
         }
       }
@@ -288,6 +286,7 @@ export function TrackingMap({
           [from.inmate.latitude, from.inmate.longitude],
           inmate,
         ]);
+        partialVictim.setStyle({ color: pathColor(to.zone) });
         partialVictim.setLatLngs([
           [from.victim.latitude, from.victim.longitude],
           victim,
