@@ -175,8 +175,8 @@ export function InmatesList() {
   }
 
   async function deleteInmate(id: string) {
-    const res = await fetch(`/api/v1/inmates/${id}`, {
-      method: "DELETE",
+    const res = await fetch(`/api/v1/inmates/${id}/delete`, {
+      method: "POST",
       credentials: "include",
     });
     const data = await res.json().catch(() => ({}));

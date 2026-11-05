@@ -187,7 +187,7 @@ export function LivroDeOcorrencias() {
     setError(null);
     try {
       const response = await fetch("/api/v1/diario", {
-        method: "PATCH",
+        method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

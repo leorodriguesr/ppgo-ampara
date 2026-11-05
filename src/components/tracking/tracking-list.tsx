@@ -218,8 +218,8 @@ export function TrackingList() {
                                 to: applied.to,
                               });
                               const response = await fetch(
-                                `/api/v1/tracking/${report.orderId}?${params.toString()}`,
-                                { method: "DELETE", credentials: "include" },
+                                `/api/v1/tracking/${report.orderId}/delete?${params.toString()}`,
+                                { method: "POST", credentials: "include" },
                               );
                               const body = await response.json().catch(() => ({}));
                               if (!response.ok) {

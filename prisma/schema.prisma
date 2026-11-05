@@ -200,8 +200,9 @@ model Inmate {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  createdBy        User              @relation("InmateCreatedBy", fields: [createdById], references: [id])
-  protectionOrders ProtectionOrder[]
+  createdBy          User                     @relation("InmateCreatedBy", fields: [createdById], references: [id])
+  protectionOrders   ProtectionOrder[]
+  simulatedLocation  SimulatedInmateLocation?
 
   @@index([externalInmateId])
   @@index([createdById])
@@ -234,6 +235,10 @@ model ProtectionOrder {
   lastContactAt       DateTime?
   /// Última coordenada considerada aproveitável.
   lastGpsAt           DateTime?
+  /// Posição atual do app, só em medida simulada. Um ponto, substituído a cada ciclo.
+  simVictimLatitude   Float?
+  simVictimLongitude  Float?
+  simVictimAt         DateTime?
   lookupStatus        LookupStatus          @default(UNKNOWN)
   createdById   String
   createdAt     DateTime              @default(now())
@@ -296,6 +301,18 @@ model Device {
 
   @@index([protectionOrderId, status])
   @@map("device")
+}
+
+/// Posição simulada do preso. Fica no banco para todas as réplicas enxergarem o mesmo ponto.
+model SimulatedInmateLocation {
+  externalInmateId String   @id
+  latitude         Float
+  longitude        Float
+  updatedAt        DateTime @updatedAt
+
+  inmate Inmate @relation(fields: [externalInmateId], references: [externalInmateId], onDelete: Cascade)
+
+  @@map("simulated_inmate_location")
 }
 
 model VictimLocation {

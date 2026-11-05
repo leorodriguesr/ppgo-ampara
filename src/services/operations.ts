@@ -6,7 +6,6 @@ import {
   zoneFromLookup,
   type DeviceSignal,
 } from "@/services/proximity-policy";
-import { getMockInmateLocation } from "@/integrations/ankle-monitor/mock-store";
 import type {
   OperationsPoint,
   OperationsTrack,
@@ -24,7 +23,15 @@ const STATE_RANK: Record<string, number> = {
 
 const boardInclude = {
   victim: { select: { fullName: true, phone: true } },
-  inmate: { select: { fullName: true, externalInmateId: true } },
+  inmate: {
+    select: {
+      fullName: true,
+      externalInmateId: true,
+      simulatedLocation: {
+        select: { latitude: true, longitude: true, updatedAt: true },
+      },
+    },
+  },
   victimLocations: {
     orderBy: { recordedAt: "desc" as const },
     take: 1,
@@ -70,18 +77,29 @@ function buildTracks(
     if (!order.victim || !order.inmate) return [];
 
     const lastVictim = order.victimLocations[0] ?? null;
-    const victimLocation: OperationsPoint | null = lastVictim
-      ? {
-          latitude: lastVictim.latitude,
-          longitude: lastVictim.longitude,
-          recordedAt: lastVictim.recordedAt.toISOString(),
-        }
-      : null;
+    const simVictim =
+      order.isSimulation &&
+      order.simVictimLatitude != null &&
+      order.simVictimLongitude != null
+        ? {
+            latitude: order.simVictimLatitude,
+            longitude: order.simVictimLongitude,
+            recordedAt: (order.simVictimAt ?? order.updatedAt).toISOString(),
+          }
+        : null;
+    const victimLocation: OperationsPoint | null = simVictim
+      ? simVictim
+      : lastVictim
+        ? {
+            latitude: lastVictim.latitude,
+            longitude: lastVictim.longitude,
+            recordedAt: lastVictim.recordedAt.toISOString(),
+          }
+        : null;
 
-    const mockInmate =
-      order.isSimulation && order.inmate.externalInmateId
-        ? getMockInmateLocation(order.inmate.externalInmateId)
-        : undefined;
+    const mockInmate = order.isSimulation
+      ? order.inmate.simulatedLocation
+      : undefined;
     const openAlert = order.alerts[0];
 
     let inmateLocation: OperationsPoint | null = null;
@@ -89,7 +107,7 @@ function buildTracks(
       inmateLocation = {
         latitude: mockInmate.latitude,
         longitude: mockInmate.longitude,
-        recordedAt: mockInmate.updatedAt,
+        recordedAt: mockInmate.updatedAt.toISOString(),
       };
     } else if (
       order.lastInmateLatitude != null &&

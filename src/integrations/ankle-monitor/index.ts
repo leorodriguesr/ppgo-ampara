@@ -6,8 +6,6 @@ export {
   InmateOutOfWindowError,
 } from "./errors";
 export {
-  setMockInmateLocation,
-  getMockInmateLocation,
   resolveMockInmateLocation,
   offsetLatLng,
   DEFAULT_MOCK_OFFSET_METERS,

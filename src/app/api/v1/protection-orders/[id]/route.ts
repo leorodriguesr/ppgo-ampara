@@ -6,7 +6,6 @@ import {
 } from "@/lib/api";
 import { updateProtectionOrderSchema } from "@/modules/protection-orders/schemas";
 import {
-  deleteProtectionOrderService,
   getProtectionOrderService,
   updateProtectionOrderService,
 } from "@/services/protection-orders";
@@ -26,7 +25,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const session = await requireApiSession();
     const meta = await getRequestMeta();
@@ -44,13 +43,3 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
-  try {
-    await requireApiSession();
-    const { id } = await context.params;
-    const result = await deleteProtectionOrderService(id);
-    return jsonOk(result);
-  } catch (error) {
-    return jsonError(error);
-  }
-}

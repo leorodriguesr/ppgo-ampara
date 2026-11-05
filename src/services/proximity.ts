@@ -16,6 +16,7 @@ import {
 } from "@/repositories/alert.repository";
 import {
   findProtectionOrderById,
+  rememberSimulatedVictimFix,
   updateProtectionOrderGeofence,
 } from "@/repositories/protection-order.repository";
 import { createVictimLocation } from "@/repositories/victim-location.repository";
@@ -219,6 +220,14 @@ async function runProximityEngine(params: {
       degradedReason: "stale_victim_fix",
       nextCheckSuggestedSeconds: intervalAfterFailure(),
       lookupStatus: "FAILED",
+    });
+  }
+
+  if (order.isSimulation && params.source === "APP") {
+    await rememberSimulatedVictimFix(order.id, {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      recordedAt,
     });
   }
 

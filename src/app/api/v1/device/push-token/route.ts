@@ -2,7 +2,7 @@ import { jsonError, jsonOk, requireDeviceAuth } from "@/lib/api";
 import { updatePushTokenSchema } from "@/modules/devices/schemas";
 import { updateDevicePushToken } from "@/repositories/device.repository";
 
-export async function PATCH(request: Request) {
+export async function POST(request: Request) {
   try {
     const device = await requireDeviceAuth(request);
     const body = updatePushTokenSchema.parse(await request.json());

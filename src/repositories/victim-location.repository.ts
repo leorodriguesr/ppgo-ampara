@@ -22,9 +22,15 @@ export async function createVictimLocation(data: CreateVictimLocationInput) {
   });
 }
 
-export async function findLatestVictimLocation(protectionOrderId: string) {
+export async function findLatestVictimLocation(
+  protectionOrderId: string,
+  source?: string,
+) {
   return prisma.victimLocation.findFirst({
-    where: { protectionOrderId },
+    where: {
+      protectionOrderId,
+      ...(source ? { source } : {}),
+    },
     orderBy: { recordedAt: "desc" },
   });
 }

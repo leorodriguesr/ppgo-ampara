@@ -14,10 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** Centro de Goiânia — referência padrão da vítima no simulador. */
-const DEFAULT_VICTIM_LAT = -16.6869;
-const DEFAULT_VICTIM_LNG = -49.2648;
-
 const METERS_PER_DEG_LAT = 111_320;
 
 type LocalizarResult = {
@@ -203,8 +199,8 @@ export function InmateLocationSimulator({
   orderId,
   radiusMeters,
 }: InmateLocationSimulatorProps) {
-  const [victimLat, setVictimLat] = useState(String(DEFAULT_VICTIM_LAT));
-  const [victimLng, setVictimLng] = useState(String(DEFAULT_VICTIM_LNG));
+  const [victimLat, setVictimLat] = useState("");
+  const [victimLng, setVictimLng] = useState("");
   const [inmateLat, setInmateLat] = useState("");
   const [inmateLng, setInmateLng] = useState("");
   const [acting, setActing] = useState<"simulate" | "localizar" | null>(null);
@@ -217,7 +213,12 @@ export function InmateLocationSimulator({
   const parseVictim = useCallback(() => {
     const latitude = Number(victimLat);
     const longitude = Number(victimLng);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    if (
+      victimLat.trim() === "" ||
+      victimLng.trim() === "" ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
       throw new Error("Coordenadas de referência da vítima inválidas");
     }
     return { latitude, longitude };
@@ -333,7 +334,13 @@ export function InmateLocationSimulator({
     const d = simulatorDistances(radiusMeters);
 
     try {
-      const victim = (await fetchLastVictimFromApp()) ?? parseVictim();
+      const victim = await fetchLastVictimFromApp();
+      if (!victim) {
+        setError(
+          "Ainda não há localização do app. Abra o mapa no celular e aguarde um ciclo.",
+        );
+        return;
+      }
       let result: Awaited<ReturnType<typeof placeInmateAt>>;
 
       switch (scenario) {
@@ -554,9 +561,8 @@ export function InmateLocationSimulator({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Importante: cole a posição real do celular (botão acima). O padrão
-            Goiânia ({DEFAULT_VICTIM_LAT}, {DEFAULT_VICTIM_LNG}) só serve se você
-            estiver testando com essas coords.
+            A referência é a última posição enviada pelo app. Os campos ficam
+            vazios até o celular concluir um ciclo com o mapa aberto.
           </p>
         </div>
 

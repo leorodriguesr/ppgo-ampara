@@ -1,12 +1,16 @@
 import { haversineDistanceMeters } from "@/lib/geo";
+import { findSimulatedInmateLocation } from "@/repositories/simulated-inmate-location.repository";
 
 import { localizarNoGuardiao } from "./guardiao";
 import { resolveMockInmateLocation } from "./mock-store";
 import type { LocalizarRequest, LocalizarResponse } from "./types";
 
-function localizarMock(request: LocalizarRequest): LocalizarResponse {
+async function localizarMock(
+  request: LocalizarRequest,
+): Promise<LocalizarResponse> {
+  const stored = await findSimulatedInmateLocation(request.idDetento);
   const location = resolveMockInmateLocation(
-    request.idDetento,
+    stored,
     request.latitude,
     request.longitude,
   );
@@ -36,7 +40,7 @@ export async function localizarDetento(
     console.log("[guardiao] medida em simulação — não chama a API", {
       idDetento: request.idDetento,
     });
-    return localizarMock(request);
+    return await localizarMock(request);
   }
   return localizarNoGuardiao(request);
 }

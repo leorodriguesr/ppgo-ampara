@@ -98,7 +98,7 @@ export function VictimForm({
               body: JSON.stringify(payload),
             })
           : await fetch(`/api/v1/victims/${victimId}`, {
-              method: "PATCH",
+              method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
               body: JSON.stringify(payload),

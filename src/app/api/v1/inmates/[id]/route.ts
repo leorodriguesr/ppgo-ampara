@@ -5,7 +5,7 @@ import {
   requireApiSession,
 } from "@/lib/api";
 import { updateInmateSchema } from "@/modules/inmates/schemas";
-import { getInmateService, updateInmateService, deleteInmateService } from "@/services/inmates";
+import { getInmateService, updateInmateService } from "@/services/inmates";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -22,7 +22,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const session = await requireApiSession();
     const meta = await getRequestMeta();
@@ -35,13 +35,3 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
-  try {
-    await requireApiSession();
-    const { id } = await context.params;
-    const result = await deleteInmateService(id);
-    return jsonOk(result);
-  } catch (error) {
-    return jsonError(error);
-  }
-}

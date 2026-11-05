@@ -1,10 +1,10 @@
 import { AppError, NotFoundError } from "@/lib/errors";
 import {
   localizarDetento,
-  setMockInmateLocation,
   type LocalizarResponse,
 } from "@/integrations/ankle-monitor";
 import { findProtectionOrderById } from "@/repositories/protection-order.repository";
+import { saveSimulatedInmateLocation } from "@/repositories/simulated-inmate-location.repository";
 import { writeAuditLog } from "@/services/write-audit-log";
 
 type AuditMeta = {
@@ -53,7 +53,7 @@ export async function simulateInmateLocationForOrder(
 
   const externalInmateId = order.inmate!.externalInmateId;
 
-  const stored = setMockInmateLocation(
+  const stored = await saveSimulatedInmateLocation(
     externalInmateId,
     location.latitude,
     location.longitude,

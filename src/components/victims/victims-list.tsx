@@ -176,8 +176,8 @@ export function VictimsList() {
   }
 
   async function deleteVictim(id: string) {
-    const res = await fetch(`/api/v1/victims/${id}`, {
-      method: "DELETE",
+    const res = await fetch(`/api/v1/victims/${id}/delete`, {
+      method: "POST",
       credentials: "include",
     });
     const data = await res.json().catch(() => ({}));

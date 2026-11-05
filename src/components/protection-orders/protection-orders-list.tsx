@@ -160,8 +160,8 @@ export function ProtectionOrdersList() {
   }
 
   async function deleteOrder(id: string) {
-    const res = await fetch(`/api/v1/protection-orders/${id}`, {
-      method: "DELETE",
+    const res = await fetch(`/api/v1/protection-orders/${id}/delete`, {
+      method: "POST",
       credentials: "include",
     });
     const data = await res.json().catch(() => ({}));

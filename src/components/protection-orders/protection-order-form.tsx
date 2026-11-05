@@ -175,7 +175,7 @@ export function ProtectionOrderForm({
               body: JSON.stringify(payload),
             })
           : await fetch(`/api/v1/protection-orders/${orderId}`, {
-              method: "PATCH",
+              method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
               body: JSON.stringify(payload),

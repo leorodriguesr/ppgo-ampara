@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function POST(request: Request) {
   try {
     const session = await requireApiSession();
     const body = decisionSchema.parse(await request.json());

@@ -162,6 +162,22 @@ export async function findProtectionOrderByJudicialRef(
   });
 }
 
+/** Um ponto atual do app, só para a simulação. Não entra no rastro. */
+export async function rememberSimulatedVictimFix(
+  id: string,
+  data: { latitude: number; longitude: number; recordedAt: Date },
+) {
+  return prisma.protectionOrder.update({
+    where: { id },
+    data: {
+      simVictimLatitude: data.latitude,
+      simVictimLongitude: data.longitude,
+      simVictimAt: data.recordedAt,
+    },
+    select: { id: true },
+  });
+}
+
 export async function updateProtectionOrderGeofence(
   id: string,
   data: {

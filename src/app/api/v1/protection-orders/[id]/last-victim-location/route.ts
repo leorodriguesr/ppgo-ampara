@@ -21,7 +21,26 @@ export async function GET(_request: Request, context: RouteContext) {
       throw new NotFoundError("Medida protetiva não encontrada");
     }
 
-    const location = await findLatestVictimLocation(order.id);
+    if (
+      order.isSimulation &&
+      order.simVictimLatitude != null &&
+      order.simVictimLongitude != null &&
+      order.simVictimAt
+    ) {
+      return jsonOk({
+        location: {
+          latitude: order.simVictimLatitude,
+          longitude: order.simVictimLongitude,
+          accuracyMeters: null,
+          recordedAt: order.simVictimAt.toISOString(),
+        },
+      });
+    }
+
+    const location = await findLatestVictimLocation(
+      order.id,
+      order.isSimulation ? "APP" : undefined,
+    );
     if (!location) {
       return jsonOk({
         location: null,
