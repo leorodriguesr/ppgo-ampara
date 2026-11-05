@@ -414,7 +414,7 @@ export function LivroDeOcorrencias() {
                           <button
                             type="button"
                             aria-label="Editar ações tomadas"
-                            className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#F4F6F8] text-[#4B5563] hover:bg-[#E8EAED] hover:text-[#1B2A41]"
+                            className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg bg-[#F4F6F8] text-[#4B5563] hover:bg-[#E8EAED] hover:text-[#1B2A41]"
                             onClick={() => setEditingId(entry.entryPointId)}
                           >
                             <Pencil className="size-3.5" />
@@ -446,6 +446,7 @@ export function LivroDeOcorrencias() {
                                 variant="outline"
                                 disabled={busy}
                                 onClick={() => void save(entry, false)}
+                                className="cursor-pointer"
                               >
                                 Salvar
                               </Button>
@@ -455,6 +456,7 @@ export function LivroDeOcorrencias() {
                                   size="sm"
                                   disabled={busy || !actions.trim()}
                                   onClick={() => void save(entry, true)}
+                                  className="cursor-pointer"
                                 >
                                   Concluir
                                 </Button>

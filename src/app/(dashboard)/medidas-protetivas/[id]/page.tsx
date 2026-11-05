@@ -9,7 +9,10 @@ import { InmateLocationSimulator } from "@/components/protection-orders/inmate-l
 import { PairingQrCard } from "@/components/protection-orders/pairing-qr-card";
 import { ProtectionOrderForm } from "@/components/protection-orders/protection-order-form";
 import { ReopenOrderPanel } from "@/components/protection-orders/reopen-order-panel";
-import { ProtectionOrderStatusBadge } from "@/components/protection-orders/status-badge";
+import {
+  ProtectionOrderSourceBadge,
+  ProtectionOrderStatusBadge,
+} from "@/components/protection-orders/status-badge";
 import { Button } from "@/components/ui/button";
 import { violationBlocksClosure } from "@/lib/protection-order-violation";
 import { cn } from "@/lib/utils";
@@ -218,10 +221,13 @@ export default function ProtectionOrderDetailPage() {
             <ArrowLeft />
           </Button>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-lg font-semibold text-[#1B2A41]">
+            {/* <h1 className="text-lg font-semibold text-[#1B2A41]">
               Processo {order.judicialRef || order.publicId}
-            </h1>
+            </h1> */}
             <ProtectionOrderStatusBadge status={order.status} />
+            <ProtectionOrderSourceBadge
+              isSimulation={order.isSimulation !== false}
+            />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

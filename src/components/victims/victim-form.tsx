@@ -212,10 +212,11 @@ export function VictimForm({
           variant="outline"
           onClick={handleCancel}
           disabled={saving}
+          className="cursor-pointer"
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={saving || fullName.trim().length < 3} className="ampara-create">
+        <Button type="submit" disabled={saving || fullName.trim().length < 3} className="ampara-create cursor-pointer">
           {saving ? <Loader2 className="animate-spin" /> : null}
           {mode === "create" ? "Cadastrar" : "Salvar"}
         </Button>

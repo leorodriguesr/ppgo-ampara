@@ -459,17 +459,19 @@ function CaseList({
                   {marginLabel(track)}
                 </p>
               </div>
-              <Link
-                href={`/acompanhamento/${track.orderId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Acompanhar caso"
-                title="Acompanhar caso"
-                onClick={(event) => event.stopPropagation()}
-                className="grid size-8 shrink-0 place-items-center rounded-full bg-[#1B2A41] text-white hover:bg-[#24364f] dark:bg-white dark:text-[#262626] dark:hover:bg-[#E8E8E8]"
-              >
-                <ArrowUpRight className="size-4" />
-              </Link>
+              {tone === "silent" ? null : (
+                <Link
+                  href={`/acompanhamento/${track.orderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Acompanhar caso"
+                  title="Acompanhar caso"
+                  onClick={(event) => event.stopPropagation()}
+                  className="grid size-8 shrink-0 place-items-center rounded-full bg-[#1B2A41] text-white hover:bg-[#24364f] dark:bg-white dark:text-[#262626] dark:hover:bg-[#E8E8E8]"
+                >
+                  <ArrowUpRight className="size-4" />
+                </Link>
+              )}
             </div>
             <div className="mt-3 grid gap-4">
               <PersonCard

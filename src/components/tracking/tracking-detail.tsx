@@ -325,6 +325,7 @@ export function TrackingDetail({ orderId }: { orderId: string }) {
                     }}
                     className={cn(
                       "flex w-full border-b border-[#F0F2F5] text-left",
+                      item.kind === "point" && "cursor-pointer",
                       item.kind === "still" && "bg-[#FAFBFC]",
                       item.kind === "point" && !active && "hover:bg-[#F7F8FA]",
                     )}

@@ -202,13 +202,14 @@ export function InmateForm({
           variant="outline"
           onClick={handleCancel}
           disabled={saving}
+          className="cursor-pointer"
         >
           Cancelar
         </Button>
         <Button
           type="submit"
           disabled={saving || !canSubmit}
-          className="ampara-create"
+          className="ampara-create cursor-pointer"
         >
           {saving ? <Loader2 className="animate-spin" /> : null}
           {mode === "create" ? "Cadastrar" : "Salvar"}

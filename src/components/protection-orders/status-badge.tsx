@@ -32,6 +32,26 @@ const STATUS_LABELS: Record<
   },
 };
 
+export function ProtectionOrderSourceBadge({
+  isSimulation,
+}: {
+  isSimulation: boolean;
+}) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "font-medium",
+        isSimulation
+          ? "border-transparent bg-[#FEF3C7] text-[#92400E]"
+          : "border-transparent bg-[#E8EEF7] text-[#1B2A41]",
+      )}
+    >
+      {isSimulation ? "Simulação" : "Guardião"}
+    </Badge>
+  );
+}
+
 export function ProtectionOrderStatusBadge({
   status,
   plain = false,

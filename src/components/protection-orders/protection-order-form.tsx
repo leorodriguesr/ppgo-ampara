@@ -430,6 +430,7 @@ export function ProtectionOrderForm({
           variant="outline"
           onClick={handleCancel}
           disabled={saving}
+          className="cursor-pointer"
         >
           Cancelar
         </Button>
@@ -438,7 +439,7 @@ export function ProtectionOrderForm({
           disabled={
             saving || (mode === "create" && (!createReady || loadingOptions))
           }
-          className="ampara-create"
+          className="ampara-create cursor-pointer"
         >
           {saving ? <Loader2 className="animate-spin" /> : null}
           {mode === "create" ? "Cadastrar" : "Salvar"}
