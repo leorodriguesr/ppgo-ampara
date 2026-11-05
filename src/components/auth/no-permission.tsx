@@ -1,15 +1,7 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
-
+import { PoliciaPenalMark } from "@/components/brand/policia-penal-mark";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { apiLogoutUsuarioLogado } from "@/lib/sso/auth-api";
 import { SSO_TOKEN_STORAGE_KEY } from "@/lib/sso/constants";
 import { useAuth } from "@/providers/auth-provider";
@@ -43,22 +35,20 @@ export function NoPermission() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <ShieldAlert className="size-6" />
-          </div>
-          <CardTitle>Sem permissão</CardTitle>
-          <CardDescription>
-            Você não tem perfil de acesso para o sistema AMPARA. Verifique
-            seus perfis no SSO ou solicite liberação à administração.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          <Button onClick={handleLogout}>Fazer logoff</Button>
-        </CardContent>
-      </Card>
+    <div className="flex min-h-svh items-center justify-center bg-[#F3F4F6] px-4">
+      <div className="w-full max-w-md border border-[#D8DEE6] bg-white px-5 py-6 text-center">
+        <PoliciaPenalMark size={56} className="mx-auto" />
+        <h1 className="mt-4 text-lg font-semibold text-[#1B2A41]">
+          Sem permissão
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-[#4B5563]">
+          Seu usuário não tem perfil no AMPARA. Peça a liberação à
+          administração ou saia e entre com outra conta.
+        </p>
+        <Button className="mt-5" onClick={handleLogout}>
+          Sair
+        </Button>
+      </div>
     </div>
   );
 }

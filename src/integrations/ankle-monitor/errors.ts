@@ -13,3 +13,11 @@ export class AnkleMonitorTimeoutError extends AppError {
     this.name = "AnkleMonitorTimeoutError";
   }
 }
+
+/** A lista veio válida e o preso desta medida não está nela. Não é falha nem distância segura. */
+export class InmateOutOfWindowError extends Error {
+  constructor() {
+    super("Monitorado fora da janela do Guardião");
+    this.name = "InmateOutOfWindowError";
+  }
+}

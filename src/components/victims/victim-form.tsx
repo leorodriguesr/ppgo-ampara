@@ -4,17 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import {
+  AddressFields,
+  addressFromInitial,
+  type AddressValues,
+} from "@/components/people/address-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 export type VictimFormValues = {
   fullName: string;
   phone?: string | null;
   document?: string | null;
-  notes?: string | null;
-};
+} & Partial<{ [K in keyof AddressValues]: string | null }>;
 
 type VictimFormProps = {
   mode: "create" | "edit";
@@ -67,7 +70,9 @@ export function VictimForm({
   const [document, setDocument] = useState(
     formatCpf(initialValues?.document ?? ""),
   );
-  const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [address, setAddress] = useState<AddressValues>(
+    addressFromInitial(initialValues),
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -80,7 +85,7 @@ export function VictimForm({
       fullName: fullName.trim(),
       phone: phone.trim(),
       document: document.trim(),
-      notes: notes.trim(),
+      ...address,
     };
 
     try {
@@ -113,10 +118,8 @@ export function VictimForm({
       const id = mode === "create" ? (data.id as string) : victimId!;
       if (onSuccess) {
         onSuccess(id);
-      } else if (mode === "create") {
-        router.push(`/victims/${id}`);
       } else {
-        router.refresh();
+        router.push("/vitimas");
       }
     } catch {
       setError("Falha de comunicação com o servidor");
@@ -130,14 +133,14 @@ export function VictimForm({
       onCancel();
       return;
     }
-    router.push("/victims");
+    router.push("/vitimas");
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="space-y-5">
         <fieldset className="space-y-3">
-          <legend className="text-[11px] font-semibold tracking-wide text-[#6B7280] uppercase">
+          <legend className="ampara-kicker text-[11px] font-semibold tracking-wide uppercase">
             Identificação
           </legend>
           <div className="space-y-1.5">
@@ -174,9 +177,6 @@ export function VictimForm({
         </fieldset>
 
         <fieldset className="space-y-3">
-          <legend className="text-[11px] font-semibold tracking-wide text-[#6B7280] uppercase">
-            Contato
-          </legend>
           <div className="space-y-1.5">
             <Label htmlFor="phone" className="text-[#1B2A41]">
               Telefone
@@ -193,25 +193,11 @@ export function VictimForm({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-3">
-          <legend className="text-[11px] font-semibold tracking-wide text-[#6B7280] uppercase">
-            Observações
-          </legend>
-          <div className="space-y-1.5">
-            <Label htmlFor="notes" className="text-[#1B2A41]">
-              Informações do atendimento
-            </Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={2000}
-              rows={4}
-              placeholder="Endereço de risco, contatos de confiança ou outras informações úteis à equipe."
-              className="min-h-[96px] rounded-md border-[#D8DEE6] bg-white px-3 py-2 text-sm text-[#1B2A41] placeholder:text-[#9CA3AF] focus-visible:border-[#C5CDD6] focus-visible:ring-1 focus-visible:ring-[#C5CDD6]"
-            />
-          </div>
-        </fieldset>
+        <AddressFields
+          idPrefix="victim-address"
+          values={address}
+          onChange={setAddress}
+        />
       </div>
 
       {error ? (
@@ -229,7 +215,7 @@ export function VictimForm({
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={saving || fullName.trim().length < 3}>
+        <Button type="submit" disabled={saving || fullName.trim().length < 3} className="ampara-create">
           {saving ? <Loader2 className="animate-spin" /> : null}
           {mode === "create" ? "Cadastrar" : "Salvar"}
         </Button>

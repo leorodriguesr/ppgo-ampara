@@ -1,14 +1,15 @@
 /** Intervalos do loop de proximidade (app respeita nextCheckSuggestedSeconds). */
 export const geofenceConfig = {
   hysteresisMeters: 20,
-  requiredConsecutiveHits: 2,
+  requiredConsecutiveHits: 1,
   intervals: {
-    foregroundSeconds: 8,
-    backgroundMinSeconds: 120,
-    backgroundMaxSeconds: 300,
+    foregroundSeconds: 10,
+    backgroundMinSeconds: 30,
+    backgroundMaxSeconds: 30,
     liveSeconds: 10,
+    liveViolationSeconds: 5,
     liveViolatingSeconds: 5,
-    violatingMinSeconds: 3,
+    violatingMinSeconds: 5,
     violatingMaxSeconds: 10,
   },
 } as const;

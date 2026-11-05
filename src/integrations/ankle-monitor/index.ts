@@ -1,6 +1,10 @@
 export { localizarDetento } from "./client";
 export { isGuardiaoConfigured, localizarNoGuardiao } from "./guardiao";
-export { AnkleMonitorApiError, AnkleMonitorTimeoutError } from "./errors";
+export {
+  AnkleMonitorApiError,
+  AnkleMonitorTimeoutError,
+  InmateOutOfWindowError,
+} from "./errors";
 export {
   setMockInmateLocation,
   getMockInmateLocation,

@@ -46,8 +46,7 @@ type TrajectoryStep =
   | "M90"
   | "NEAR"
   | "M30"
-  | "ARRIVED"
-  | "PENDING_SAFE";
+  | "ARRIVED";
 
 const FIXED_METERS: Partial<Record<TrajectoryStep, number>> = {
   M270: 270,
@@ -81,7 +80,6 @@ function stepDistance(id: TrajectoryStep, distances: SimulatorDistances) {
 
   switch (id) {
     case "FAR":
-    case "PENDING_SAFE":
       return distances.far;
     case "APPROACHING":
       return distances.approaching;
@@ -176,22 +174,25 @@ const TRAJECTORY_STEPS: {
     title: "Chegou",
     hint: "Preso junto da vítima (~8 m)",
   },
-  {
-    id: "PENDING_SAFE",
-    step: null,
-    title: "Afastando",
-    hint: "Em violação + 1 leitura longe — saindo da zona",
-  },
 ];
 
 function offsetFromVictim(
   victimLat: number,
   victimLng: number,
-  northMeters: number,
+  meters: number,
+  axis: "north" | "east",
 ) {
-  const dLat = northMeters / METERS_PER_DEG_LAT;
+  if (axis === "east") {
+    const metersPerDegLng =
+      METERS_PER_DEG_LAT * Math.cos((victimLat * Math.PI) / 180);
+    return {
+      latitude: victimLat,
+      longitude: victimLng + meters / metersPerDegLng,
+    };
+  }
+
   return {
-    latitude: victimLat + dLat,
+    latitude: victimLat + meters / METERS_PER_DEG_LAT,
     longitude: victimLng,
   };
 }
@@ -205,9 +206,7 @@ export function InmateLocationSimulator({
   const [inmateLat, setInmateLat] = useState("");
   const [inmateLng, setInmateLng] = useState("");
   const [acting, setActing] = useState<"simulate" | "localizar" | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<TrajectoryStep | null>(
-    null,
-  );
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [localizarResult, setLocalizarResult] =
@@ -225,11 +224,13 @@ export function InmateLocationSimulator({
   function applyPreset(
     northMeters: number,
     victim: { latitude: number; longitude: number },
+    axis: "north" | "east",
   ) {
     const offset = offsetFromVictim(
       victim.latitude,
       victim.longitude,
       northMeters,
+      axis,
     );
     setInmateLat(offset.latitude.toFixed(6));
     setInmateLng(offset.longitude.toFixed(6));
@@ -268,8 +269,9 @@ export function InmateLocationSimulator({
     northMeters: number,
     ticks: number,
     victim = parseVictim(),
+    axis: "north" | "east" = "north",
   ) {
-    const offset = applyPreset(northMeters, victim);
+    const offset = applyPreset(northMeters, victim, axis);
 
     const simRes = await fetch(
       `/api/v1/protection-orders/${orderId}/simulate-location`,
@@ -315,10 +317,13 @@ export function InmateLocationSimulator({
     return { geofence, dist, northMeters };
   }
 
-  /** Preset + grava no mock + avalia geofence até o ponto do trajeto. */
-  async function playScenario(scenario: TrajectoryStep) {
+  /** Um clique, uma posição. Aproximação pelo norte; afastamento pelo leste. */
+  async function playScenario(
+    scenario: TrajectoryStep,
+    axis: "north" | "east" = "north",
+  ) {
     setActing("simulate");
-    setSelectedPreset(scenario);
+    setSelectedPreset(`${axis}:${scenario}`);
     setError(null);
     setMessage(null);
     setLocalizarResult(null);
@@ -331,36 +336,32 @@ export function InmateLocationSimulator({
 
       switch (scenario) {
         case "FAR":
-          result = await placeInmateAt(d.far, 2, victim);
+          result = await placeInmateAt(d.far, 2, victim, axis);
           break;
         case "APPROACHING":
-          result = await placeInmateAt(d.approaching, 2, victim);
+          result = await placeInmateAt(d.approaching, 2, victim, axis);
           break;
         case "EDGE":
-          result = await placeInmateAt(d.edge, 2, victim);
+          result = await placeInmateAt(d.edge, 2, victim, axis);
           break;
         case "AT_RADIUS":
-          result = await placeInmateAt(d.atRadius, 2, victim);
+          result = await placeInmateAt(d.atRadius, 2, victim, axis);
           break;
         case "M270":
         case "M180":
         case "M120":
         case "M90":
         case "M30":
-          result = await placeInmateAt(FIXED_METERS[scenario]!, 1, victim);
+          result = await placeInmateAt(FIXED_METERS[scenario]!, 1, victim, axis);
           break;
         case "PENDING_VIOLATION":
-          result = await placeInmateAt(d.entered, 1, victim);
+          result = await placeInmateAt(d.entered, 1, victim, axis);
           break;
         case "NEAR":
-          result = await placeInmateAt(d.near, 2, victim);
+          result = await placeInmateAt(d.near, 2, victim, axis);
           break;
         case "ARRIVED":
-          result = await placeInmateAt(d.arrived, 2, victim);
-          break;
-        case "PENDING_SAFE":
-          await placeInmateAt(d.near, 2, victim);
-          result = await placeInmateAt(d.far, 1, victim);
+          result = await placeInmateAt(d.arrived, 2, victim, axis);
           break;
       }
 
@@ -368,8 +369,9 @@ export function InmateLocationSimulator({
         TRAJECTORY_STEPS.find((item) => item.id === scenario)?.title ??
         scenario;
       const state = result.geofence?.geofenceState ?? "—";
+      const direction = axis === "east" ? " a leste" : " ao norte";
       setMessage(
-        `${label} — preso a ~${result.northMeters} m (distância ${result.dist} m). Estado no servidor: ${state}. Veja o app.`,
+        `${label} — preso a ~${result.northMeters} m${direction} (distância ${result.dist} m). Estado no servidor: ${state}. Veja o app.`,
       );
     } catch (e) {
       setError(
@@ -509,15 +511,10 @@ export function InmateLocationSimulator({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MapPin className="size-4" />
-          Simulador de posição (mock)
-        </CardTitle>
+        <CardTitle className="text-base">Simulador de posição</CardTitle>
         <CardDescription>
-          O raio desta medida é {radiusMeters} m (alerta em até{" "}
-          {radiusMeters} m, sai em {radiusMeters + HYSTERESIS_METERS} m). Use o
-          trajeto em ordem para aproximar o preso da vítima. Sem posição
-          gravada, o mock fica ~800 m ao norte.
+          Raio desta medida: {radiusMeters} m. O alerta abre até {radiusMeters} m
+          e encerra a partir de {radiusMeters + HYSTERESIS_METERS} m.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -576,13 +573,16 @@ export function InmateLocationSimulator({
                   <Button
                     key={item.id}
                     type="button"
-                    variant={selectedPreset === item.id ? "default" : "outline"}
+                    variant={
+                      selectedPreset === `north:${item.id}` ? "default" : "outline"
+                    }
                     size="sm"
                     disabled={acting !== null}
                     title={`${item.hint} (~${stepDistance(item.id, distances)} m)`}
-                    onClick={() => void playScenario(item.id)}
+                    onClick={() => void playScenario(item.id, "north")}
                   >
-                    {acting === "simulate" && selectedPreset === item.id ? (
+                    {acting === "simulate" &&
+                    selectedPreset === `north:${item.id}` ? (
                       <Loader2
                         className="animate-spin"
                         data-icon="inline-start"
@@ -601,32 +601,50 @@ export function InmateLocationSimulator({
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Afastamento</p>
-            {TRAJECTORY_STEPS.filter((item) => item.step === null).map(
-              (item) => (
-                <Button
-                  key={item.id}
-                  type="button"
-                  variant={selectedPreset === item.id ? "default" : "outline"}
-                  size="sm"
-                  disabled={acting !== null}
-                  title={item.hint}
-                  onClick={() => void playScenario(item.id)}
-                >
-                  {acting === "simulate" && selectedPreset === item.id ? (
-                    <Loader2
-                      className="animate-spin"
-                      data-icon="inline-start"
-                    />
-                  ) : null}
-                  {item.title}
-                </Button>
-              ),
-            )}
+            <div className="flex flex-wrap gap-2">
+              {TRAJECTORY_STEPS.filter((item) => item.step !== null)
+                .slice()
+                .sort(
+                  (a, b) =>
+                    stepDistance(a.id, distances) -
+                    stepDistance(b.id, distances),
+                )
+                .map((item, index) => (
+                  <Button
+                    key={item.id}
+                    type="button"
+                    variant={
+                      selectedPreset === `east:${item.id}`
+                        ? "default"
+                        : "outline"
+                    }
+                    size="sm"
+                    disabled={acting !== null}
+                    title={`${item.hint} (~${stepDistance(item.id, distances)} m a leste)`}
+                    onClick={() => void playScenario(item.id, "east")}
+                  >
+                    {acting === "simulate" &&
+                    selectedPreset === `east:${item.id}` ? (
+                      <Loader2
+                        className="animate-spin"
+                        data-icon="inline-start"
+                      />
+                    ) : null}
+                    {index + 1}.{" "}
+                    {item.id === "EDGE"
+                      ? `${stepDistance(item.id, distances)} m`
+                      : item.title}
+                    <span className="text-xs opacity-70">
+                      ~{stepDistance(item.id, distances)} m
+                    </span>
+                  </Button>
+                ))}
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Clique na ordem para aproximar o preso. Longe e Na borda ficam
-            seguros. No raio (e mais perto) dispara a violação após 2
-            leituras. 270, 180, 120, 90 e 30 m testam o mapa.
+            Clique na ordem, um passo de cada vez. A aproximação vai pelo
+            norte e o afastamento pelo leste. Cada clique grava uma posição
+            no relatório.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">

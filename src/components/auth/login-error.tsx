@@ -1,15 +1,7 @@
 "use client";
 
-import { Database, ShieldAlert } from "lucide-react";
-
+import { PoliciaPenalMark } from "@/components/brand/policia-penal-mark";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { getUrlLogin } from "@/lib/sso/auth-api";
 
 type LoginErrorProps = {
@@ -18,24 +10,22 @@ type LoginErrorProps = {
 
 const copy: Record<
   LoginErrorProps["variant"],
-  { title: string; description: string; icon: typeof ShieldAlert }
+  { title: string; description: string }
 > = {
   db: {
     title: "Banco de dados indisponível",
     description:
-      "O login no SSO funcionou, mas o painel não conseguiu gravar a sessão porque o PostgreSQL recusou a conexão. Suba o banco (por exemplo npx prisma dev) e tente de novo.",
-    icon: Database,
+      "O SSO autenticou, mas a sessão não foi gravada. Confira o PostgreSQL e tente de novo.",
   },
   sso: {
     title: "Não foi possível concluir o login",
     description:
-      "O token SSO chegou, mas a sessão local falhou. Confira se o banco está no ar e tente novamente. Evite recarregar o SSO em loop — a política de segurança da SSP bloqueia a segunda tentativa.",
-    icon: ShieldAlert,
+      "A sessão local falhou depois do SSO. Tente novamente sem recarregar a página do login.",
   },
 };
 
 export function LoginError({ variant }: LoginErrorProps) {
-  const { title, description, icon: Icon } = copy[variant];
+  const { title, description } = copy[variant];
 
   function retry() {
     if (variant === "db") {
@@ -47,19 +37,15 @@ export function LoginError({ variant }: LoginErrorProps) {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <Icon className="size-6" />
-          </div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          <Button onClick={retry}>Tentar login novamente</Button>
-        </CardContent>
-      </Card>
+    <div className="flex min-h-svh items-center justify-center bg-[#F3F4F6] px-4">
+      <div className="w-full max-w-md border border-[#D8DEE6] bg-white px-5 py-6 text-center">
+        <PoliciaPenalMark size={56} className="mx-auto" />
+        <h1 className="mt-4 text-lg font-semibold text-[#1B2A41]">{title}</h1>
+        <p className="mt-2 text-sm leading-6 text-[#4B5563]">{description}</p>
+        <Button className="mt-5" onClick={retry}>
+          Tentar de novo
+        </Button>
+      </div>
     </div>
   );
 }

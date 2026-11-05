@@ -4,17 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import {
+  AddressFields,
+  addressFromInitial,
+  type AddressValues,
+} from "@/components/people/address-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 export type InmateFormValues = {
   fullName: string;
   externalInmateId: string;
   document?: string | null;
-  notes?: string | null;
-};
+} & Partial<{ [K in keyof AddressValues]: string | null }>;
 
 type InmateFormProps = {
   mode: "create" | "edit";
@@ -56,7 +59,9 @@ export function InmateForm({
   const [document, setDocument] = useState(
     formatCpf(initialValues?.document ?? ""),
   );
-  const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [address, setAddress] = useState<AddressValues>(
+    addressFromInitial(initialValues),
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -72,7 +77,7 @@ export function InmateForm({
       fullName: fullName.trim(),
       externalInmateId: externalInmateId.trim(),
       document: document.trim(),
-      notes: notes.trim(),
+      ...address,
     };
 
     try {
@@ -105,10 +110,8 @@ export function InmateForm({
       const id = mode === "create" ? (data.id as string) : inmateId!;
       if (onSuccess) {
         onSuccess(id);
-      } else if (mode === "create") {
-        router.push(`/inmates/${id}`);
       } else {
-        router.refresh();
+        router.push("/presos");
       }
     } catch {
       setError("Falha de comunicação com o servidor");
@@ -122,14 +125,14 @@ export function InmateForm({
       onCancel();
       return;
     }
-    router.push("/inmates");
+    router.push("/presos");
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="space-y-5">
         <fieldset className="space-y-3">
-          <legend className="text-[11px] font-semibold tracking-wide text-[#6B7280] uppercase">
+          <legend className="ampara-kicker text-[11px] font-semibold tracking-wide uppercase">
             Identificação
           </legend>
           <div className="space-y-1.5">
@@ -180,25 +183,11 @@ export function InmateForm({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-3">
-          <legend className="text-[11px] font-semibold tracking-wide text-[#6B7280] uppercase">
-            Observações
-          </legend>
-          <div className="space-y-1.5">
-            <Label htmlFor="notes" className="text-[#1B2A41]">
-              Informações do monitoramento
-            </Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={2000}
-              rows={4}
-              placeholder="Unidade, regime ou outras informações úteis à equipe."
-              className="min-h-[96px] rounded-md border-[#D8DEE6] bg-white px-3 py-2 text-sm text-[#1B2A41] placeholder:text-[#9CA3AF] focus-visible:border-[#C5CDD6] focus-visible:ring-1 focus-visible:ring-[#C5CDD6]"
-            />
-          </div>
-        </fieldset>
+        <AddressFields
+          idPrefix="inmate-address"
+          values={address}
+          onChange={setAddress}
+        />
       </div>
 
       {error ? (
@@ -219,7 +208,7 @@ export function InmateForm({
         <Button
           type="submit"
           disabled={saving || !canSubmit}
-          className="bg-[#1B2A41] text-white hover:bg-[#24364f]"
+          className="ampara-create"
         >
           {saving ? <Loader2 className="animate-spin" /> : null}
           {mode === "create" ? "Cadastrar" : "Salvar"}

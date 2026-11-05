@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { addressSchema } from "@/modules/address";
+
 export const createVictimSchema = z.object({
   fullName: z
     .string()
@@ -20,14 +22,7 @@ export const createVictimSchema = z.object({
     .optional()
     .or(z.literal(""))
     .transform((value) => (value ? value : undefined)),
-  notes: z
-    .string()
-    .trim()
-    .max(2000)
-    .optional()
-    .or(z.literal(""))
-    .transform((value) => (value ? value : undefined)),
-});
+}).extend(addressSchema.shape);
 
 export const updateVictimSchema = createVictimSchema.partial().refine(
   (data) => Object.keys(data).length > 0,

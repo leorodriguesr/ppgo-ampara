@@ -1,4 +1,5 @@
 import { hashToken } from "@/lib/crypto";
+import { isTransientDatabaseError } from "@/lib/db-transient";
 import { AppError, UnauthorizedError } from "@/lib/errors";
 import {
   findActiveDeviceByTokenHash,
@@ -6,6 +7,17 @@ import {
   type ActiveDeviceWithOrder,
 } from "@/repositories/device.repository";
 import { ensureProtectionOrderNotExpired } from "@/services/protection-order-expiry";
+
+async function findActiveDevice(tokenHash: string) {
+  try {
+    const device = await findActiveDeviceByTokenHash(tokenHash);
+    if (device) return device;
+  } catch (error) {
+    if (!isTransientDatabaseError(error)) throw error;
+  }
+
+  return findActiveDeviceByTokenHash(tokenHash);
+}
 
 /**
  * Autentica dispositivo via `Authorization: Bearer <deviceToken>`.
@@ -24,7 +36,7 @@ export async function requireDeviceAuth(
     throw new UnauthorizedError("Token de dispositivo inválido");
   }
 
-  const device = await findActiveDeviceByTokenHash(hashToken(token));
+  const device = await findActiveDevice(hashToken(token));
   if (!device) {
     throw new AppError(
       "DEVICE_UNAUTHORIZED",

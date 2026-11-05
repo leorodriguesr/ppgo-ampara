@@ -1,16 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
 
+import { PoliciaPenalMark } from "@/components/brand/policia-penal-mark";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { SSO_TOKEN_STORAGE_KEY } from "@/lib/sso/constants";
 
 /**
@@ -26,27 +19,24 @@ export default function DevLoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <ShieldCheck className="size-6" />
-          </div>
-          <CardTitle>Login de desenvolvimento</CardTitle>
-          <CardDescription>
-            Simula o retorno do SSO para testar o painel sem o IdP real.
-            Disponível só em desenvolvimento.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
+    <div className="flex min-h-svh items-center justify-center bg-[#F3F4F6] px-4">
+      <div className="w-full max-w-sm border border-[#D8DEE6] bg-white px-5 py-6">
+        <PoliciaPenalMark size={56} />
+        <h1 className="mt-4 text-lg font-semibold text-[#1B2A41]">
+          Acesso local
+        </h1>
+        <p className="mt-1 text-sm text-[#4B5563]">
+          Entra no painel sem o SSO. Só existe em desenvolvimento.
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
           <Button onClick={() => enterAs("dev-mock-admin")}>
-            Entrar como ADMIN
+            Entrar como administrador
           </Button>
           <Button variant="outline" onClick={() => enterAs("dev-mock-police")}>
-            Entrar como POLICE
+            Entrar como policial
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

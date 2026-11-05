@@ -40,7 +40,7 @@ export function RowDeleteButton({
       disabled={busy}
       aria-label={label}
       title={label}
-      className="text-[#9CA3AF] hover:bg-transparent hover:text-[#B45353]"
+      className="cursor-pointer text-[#9CA3AF] hover:bg-transparent hover:text-[#B45353]"
       onClick={(event) => void handleClick(event)}
       onKeyDown={(event) => event.stopPropagation()}
     >

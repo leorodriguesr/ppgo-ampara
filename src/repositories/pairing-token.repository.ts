@@ -31,6 +31,7 @@ export async function findPairingTokenByHash(tokenHash: string) {
           judicialRef: true,
           startsAt: true,
           endsAt: true,
+          geofenceState: true,
         },
       },
     },

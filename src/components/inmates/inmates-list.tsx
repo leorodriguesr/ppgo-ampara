@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus } from "lucide-react";
 
 import { InmateForm } from "@/components/inmates/inmate-form";
+import { PageLoading } from "@/components/layout/page-loading";
 import { RowDeleteButton } from "@/components/layout/row-delete-button";
+import {
+  ListSearch,
+  ListSearchField,
+  ListSearchSubmit,
+} from "@/components/layout/list-search";
+import { PersonDetailDialog } from "@/components/people/person-detail-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,8 +20,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { formatDate } from "@/lib/format";
+import { formatAddress, formatDay, formatPersonName } from "@/lib/format";
+
+type LinkedOrder = {
+  id: string;
+  publicId: string;
+  judicialRef: string | null;
+  status: string;
+  radiusMeters: number;
+  watchRadiusMeters: number;
+  createdAt: string;
+  victim?: { fullName: string } | null;
+};
 
 type InmateRow = {
   id: string;
@@ -24,6 +40,17 @@ type InmateRow = {
   document: string | null;
   createdAt: string;
   _count?: { protectionOrders: number };
+};
+
+type InmateDetail = InmateRow & {
+  addressZip: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressDistrict: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  protectionOrders: LinkedOrder[];
 };
 
 type ListResponse = {
@@ -42,6 +69,13 @@ export function InmatesList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<InmateDetail | null>(null);
+  const [details, setDetails] = useState<Record<string, InmateDetail>>({});
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailBusyId, setDetailBusyId] = useState<string | null>(null);
+  const [editBusyId, setEditBusyId] = useState<string | null>(null);
+  const detailRequest = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +122,58 @@ export function InmatesList() {
     setSearch(q);
   }
 
+  async function loadDetail(id: string, force = false) {
+    const cached = details[id];
+    if (cached && !force) return cached;
+
+    const res = await fetch(`/api/v1/inmates/${id}`, { credentials: "include" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Não foi possível carregar o preso",
+      );
+    }
+    const detail = data as InmateDetail;
+    setDetails((current) => ({ ...current, [id]: detail }));
+    return detail;
+  }
+
+  async function openDetails(id: string) {
+    const request = ++detailRequest.current;
+    setViewingId(id);
+    setDetailError(null);
+    if (details[id]) {
+      setDetailBusyId(null);
+      return;
+    }
+    setDetailBusyId(id);
+    try {
+      await loadDetail(id);
+    } catch (failure) {
+      if (detailRequest.current !== request) return;
+      setDetailError(
+        failure instanceof Error ? failure.message : "Não foi possível carregar o preso",
+      );
+    } finally {
+      if (detailRequest.current === request) setDetailBusyId(null);
+    }
+  }
+
+  async function openEdit(id: string) {
+    setEditBusyId(id);
+    try {
+      setEditing(await loadDetail(id));
+    } catch (failure) {
+      setError(
+        failure instanceof Error ? failure.message : "Não foi possível carregar o preso",
+      );
+    } finally {
+      setEditBusyId((current) => (current === id ? null : current));
+    }
+  }
+
   async function deleteInmate(id: string) {
     const res = await fetch(`/api/v1/inmates/${id}`, {
       method: "DELETE",
@@ -105,11 +191,17 @@ export function InmatesList() {
     await load();
   }
 
+  const viewingRow = result?.data.find((item) => item.id === viewingId) ?? null;
+  const viewingDetail = viewingId ? details[viewingId] : undefined;
+  const viewing = viewingDetail ?? viewingRow;
+
+  if (loading && !result) return <PageLoading />;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-[#1B2A41]">
+          <h1 data-tone="indigo" className="ampara-title text-lg font-semibold text-[#1B2A41]">
             Presos
           </h1>
           <p className="text-sm text-[#6B7280]">
@@ -121,31 +213,23 @@ export function InmatesList() {
         <Button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="cursor-pointer bg-[#1B2A41] text-white hover:bg-[#24364f]"
+          className="ampara-create cursor-pointer"
         >
           <Plus data-icon="inline-start" />
           Novo preso
         </Button>
       </div>
 
-      <form
-        onSubmit={handleSearch}
-        className="flex max-w-xl flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2.5"
-      >
-        <div className="relative min-w-[240px] flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-[#9CA3AF]" />
-          <Input
-            id="inmate-search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nome, ID da tornozeleira ou documento"
-            className="h-9 bg-white pl-8"
-          />
-        </div>
-        <Button type="submit" variant="outline" size="sm">
-          Buscar
-        </Button>
-      </form>
+      <ListSearch onSubmit={handleSearch}>
+        <ListSearchField
+          id="inmate-search"
+          value={q}
+          onChange={setQ}
+          placeholder="Nome, ID da tornozeleira ou documento"
+          label="Nome, ID da tornozeleira ou documento"
+        />
+        <ListSearchSubmit />
+      </ListSearch>
 
       <div>
         {error ? (
@@ -161,53 +245,82 @@ export function InmatesList() {
         ) : null}
 
         {!loading && result && result.data.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-[#E8EAED] text-[12px] font-medium text-[#4B5563]">
-                <tr className="border-b border-[#E5E7EB]">
-                  <th className="py-2 pr-4 pl-3 font-medium">Nome</th>
-                  <th className="py-2 pr-4 font-medium">ID tornozeleira</th>
-                  <th className="py-2 pr-4 font-medium">Documento</th>
-                  <th className="py-2 pr-4 font-medium">Medidas</th>
-                  <th className="py-2 pr-3 font-medium">Cadastro</th>
-                  <th className="w-9 py-2 pr-2 pl-1 font-medium" />
+              <thead className="ampara-thead text-sm font-semibold">
+                <tr>
+                  <th className="py-2.5 pr-4 pl-3 font-semibold">Nome</th>
+                  <th className="py-2.5 pr-4 font-semibold">ID tornozeleira</th>
+                  <th className="py-2.5 pr-4 font-semibold">Documento</th>
+                  <th className="py-2.5 pr-4 font-semibold">Medidas</th>
+                  <th className="py-2.5 pr-3 font-semibold">Cadastro</th>
+                  <th className="w-28 py-2.5 pr-2 pl-1 font-semibold" />
                 </tr>
               </thead>
               <tbody>
-                {result.data.map((inmate) => (
-                  <tr
-                    key={inmate.id}
-                    className="border-b border-[#E5E7EB] last:border-b-0"
-                  >
-                    <td className="py-3 pr-4 pl-3">
-                      <Link
-                        href={`/inmates/${inmate.id}`}
-                        className="font-medium text-[#1B2A41] hover:underline"
-                      >
-                        {inmate.fullName}
-                      </Link>
-                    </td>
-                    <td className="py-3 pr-4 font-mono text-xs text-[#4B5563]">
-                      {inmate.externalInmateId}
-                    </td>
-                    <td className="py-3 pr-4 text-[#4B5563]">
-                      {inmate.document || "—"}
-                    </td>
-                    <td className="py-3 pr-4 text-[#4B5563]">
-                      {inmate._count?.protectionOrders ?? 0}
-                    </td>
-                    <td className="py-3 text-[#6B7280]">
-                      {formatDate(inmate.createdAt)}
-                    </td>
-                    <td className="w-9 py-3 pr-2 pl-1">
-                      <RowDeleteButton
-                        label="Excluir preso"
-                        confirmMessage={`Excluir ${inmate.fullName}? As medidas ligadas a este preso também serão removidas.`}
-                        onDelete={() => deleteInmate(inmate.id)}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {result.data.map((inmate) => {
+                  return (
+                    <tr
+                      key={inmate.id}
+                      className="ampara-row border-b border-[#F0F2F5] transition-colors"
+                    >
+                      <td className="py-3 pr-4 pl-3 font-normal text-[#1B2A41]">
+                        {formatPersonName(inmate.fullName)}
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-sm font-normal text-[#1B2A41]">
+                        {inmate.externalInmateId}
+                      </td>
+                      <td className="py-3 pr-4 font-normal text-[#1B2A41]">
+                        {inmate.document || "—"}
+                      </td>
+                      <td className="py-3 pr-4 font-normal text-[#1B2A41]">
+                        {inmate._count?.protectionOrders ?? 0}
+                      </td>
+                      <td className="py-3 pr-3 font-normal text-[#1B2A41]">
+                        {formatDay(inmate.createdAt)}
+                      </td>
+                      <td className="w-28 py-3 pr-2 pl-1">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="Ver detalhes do preso"
+                            title="Ver detalhes"
+                            className="cursor-pointer text-[#1565A8] hover:bg-transparent hover:text-[#115488] dark:text-[#8EC4EF] dark:hover:text-white"
+                            onClick={() => void openDetails(inmate.id)}
+                          >
+                            {detailBusyId === inmate.id ? (
+                              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+                            ) : (
+                              <Eye className="size-3.5" strokeWidth={1.75} />
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="Editar preso"
+                            title="Editar preso"
+                            className="cursor-pointer text-[#8A6A08] hover:bg-transparent hover:text-[#6E5406] dark:text-[#F0D36A] dark:hover:text-white"
+                            onClick={() => void openEdit(inmate.id)}
+                          >
+                            {editBusyId === inmate.id ? (
+                              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+                            ) : (
+                              <Pencil className="size-3.5" strokeWidth={1.75} />
+                            )}
+                          </Button>
+                          <RowDeleteButton
+                            label="Excluir preso"
+                            confirmMessage={`Excluir ${inmate.fullName}? As medidas ligadas a este preso também serão removidas.`}
+                            onDelete={() => deleteInmate(inmate.id)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -244,16 +357,57 @@ export function InmatesList() {
         ) : null}
       </div>
 
+      <PersonDetailDialog
+        open={viewingId !== null && (Boolean(viewingDetail) || Boolean(detailError))}
+        onOpenChange={(open) => {
+          if (!open) setViewingId(null);
+        }}
+        name={viewing?.fullName ?? "Preso"}
+        description={
+          viewing
+            ? `Cadastrado em ${formatDay(viewing.createdAt)}`
+            : "Carregando os dados do preso"
+        }
+        fields={[
+          { label: "ID da tornozeleira", value: viewing?.externalInmateId || "—" },
+          { label: "Documento", value: viewing?.document || "—" },
+        ]}
+        loading={Boolean(viewingId) && !viewingDetail && !detailError}
+        error={viewingDetail ? null : detailError}
+        address={viewingDetail ? formatAddress(viewingDetail) : null}
+        orders={(viewingDetail?.protectionOrders ?? []).map((order) => ({
+          id: order.id,
+          publicId: order.publicId,
+          judicialRef: order.judicialRef,
+          status: order.status,
+          radiusMeters: order.radiusMeters,
+          watchRadiusMeters: order.watchRadiusMeters,
+          createdAt: order.createdAt,
+          counterpartName: order.victim?.fullName ?? null,
+          counterpartRole: "Vítima",
+        }))}
+        ordersTotal={
+          viewingDetail?._count?.protectionOrders ??
+          viewingDetail?.protectionOrders.length ??
+          0
+        }
+        onEdit={() => {
+          if (!viewingDetail) return;
+          setViewingId(null);
+          setEditing(viewingDetail);
+        }}
+      />
+
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-xl overflow-hidden">
+        <DialogContent tone="indigo" className="flex max-h-[min(760px,calc(100svh-2rem))] max-w-xl flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Novo preso</DialogTitle>
+            <DialogTitle tone="indigo">Novo preso</DialogTitle>
             <DialogDescription>
               Preencha os dados cadastrais. Nome e ID da tornozeleira são
               obrigatórios.
             </DialogDescription>
           </DialogHeader>
-          <div className="px-5 pt-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
             <InmateForm
               key={createOpen ? "open" : "closed"}
               mode="create"
@@ -265,6 +419,35 @@ export function InmatesList() {
               }}
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent tone="indigo" className="flex max-h-[min(760px,calc(100svh-2rem))] max-w-xl flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle tone="indigo">Editar preso</DialogTitle>
+            <DialogDescription>
+              Atualize os dados cadastrais. Nome e ID da tornozeleira são
+              obrigatórios.
+            </DialogDescription>
+          </DialogHeader>
+          {editing ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
+              <InmateForm
+                key={editing.id}
+                mode="edit"
+                inmateId={editing.id}
+                initialValues={editing}
+                onCancel={() => setEditing(null)}
+                onSuccess={() => {
+                  const id = editing.id;
+                  setEditing(null);
+                  void load();
+                  void loadDetail(id, true);
+                }}
+              />
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

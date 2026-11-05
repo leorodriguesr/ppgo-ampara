@@ -1,34 +1,13 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-
 type ComingSoonProps = {
   title: string;
   description: string;
-  stage: string;
 };
 
-export function ComingSoon({ title, description, stage }: ComingSoonProps) {
+export function ComingSoon({ title, description }: ComingSoonProps) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle>{title}</CardTitle>
-          <Badge variant="secondary">{stage}</Badge>
-        </div>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Esta funcionalidade será implementada na próxima etapa do MVP. A
-          fundação (auth, RBAC, schema e layout) já está pronta.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="max-w-xl">
+      <h1 className="text-lg font-semibold text-[#1B2A41]">{title}</h1>
+      <p className="mt-2 text-sm leading-6 text-[#4B5563]">{description}</p>
+    </div>
   );
 }

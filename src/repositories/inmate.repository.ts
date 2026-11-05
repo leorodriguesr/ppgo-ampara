@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { addressColumns, type AddressInput } from "@/modules/address";
 import { deleteProtectionOrdersCascade } from "@/repositories/protection-order.repository";
 
 export type InmateListParams = {
@@ -8,20 +9,21 @@ export type InmateListParams = {
   pageSize?: number;
 };
 
-export async function createInmate(data: {
-  fullName: string;
-  externalInmateId: string;
-  document?: string;
-  notes?: string;
-  createdById: string;
-}) {
+export async function createInmate(
+  data: {
+    fullName: string;
+    externalInmateId: string;
+    document?: string;
+    createdById: string;
+  } & Partial<AddressInput>,
+) {
   return prisma.inmate.create({
     data: {
       fullName: data.fullName,
       externalInmateId: data.externalInmateId,
       document: data.document,
-      notes: data.notes,
       createdById: data.createdById,
+      ...addressColumns(data),
     },
     include: {
       createdBy: {
@@ -38,8 +40,7 @@ export async function updateInmate(
     fullName?: string;
     externalInmateId?: string;
     document?: string | null;
-    notes?: string | null;
-  },
+  } & Partial<AddressInput>,
 ) {
   return prisma.inmate.update({
     where: { id },
@@ -64,9 +65,12 @@ export async function findInmateById(id: string) {
         select: {
           id: true,
           publicId: true,
+          judicialRef: true,
           status: true,
           radiusMeters: true,
+          watchRadiusMeters: true,
           createdAt: true,
+          victim: { select: { fullName: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 10,

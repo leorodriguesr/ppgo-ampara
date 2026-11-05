@@ -4,9 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import { DayField } from "@/components/layout/list-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { formatPersonName } from "@/lib/format";
+import { toDateInputValue } from "@/lib/vigencia-day";
 
 type Option = {
   id: string;
@@ -18,6 +22,7 @@ export type ProtectionOrderFormValues = {
   victimId?: string;
   inmateId?: string;
   radiusMeters: number;
+  watchRadiusMeters?: number;
   isSimulation?: boolean;
   judicialRef?: string | null;
   startsAt?: string | Date | null;
@@ -32,21 +37,11 @@ type ProtectionOrderFormProps = {
   orderId?: string;
   onSuccess?: (id: string) => void;
   onCancel?: () => void;
+  pinnedFooter?: boolean;
 };
-
-function toDatetimeLocalValue(value?: string | Date | null) {
-  if (!value) return "";
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return "";
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 const fieldClass =
   "h-10 rounded-md border-[#D8DEE6] bg-white px-3 text-sm text-[#1B2A41] placeholder:text-[#9CA3AF] focus-visible:border-[#C5CDD6] focus-visible:ring-1 focus-visible:ring-[#C5CDD6]";
-
-import { NativeSelect } from "@/components/ui/native-select";
 
 export function ProtectionOrderForm({
   mode,
@@ -54,12 +49,16 @@ export function ProtectionOrderForm({
   orderId,
   onSuccess,
   onCancel,
+  pinnedFooter = false,
 }: ProtectionOrderFormProps) {
   const router = useRouter();
   const [victimId, setVictimId] = useState(initialValues?.victimId ?? "");
   const [inmateId, setInmateId] = useState(initialValues?.inmateId ?? "");
   const [radiusMeters, setRadiusMeters] = useState(
     String(initialValues?.radiusMeters ?? 300),
+  );
+  const [watchRadiusMeters, setWatchRadiusMeters] = useState(
+    String(initialValues?.watchRadiusMeters ?? 1000),
   );
   const [isSimulation, setIsSimulation] = useState(
     initialValues?.isSimulation ?? true,
@@ -68,10 +67,10 @@ export function ProtectionOrderForm({
     initialValues?.judicialRef ?? "",
   );
   const [startsAt, setStartsAt] = useState(
-    toDatetimeLocalValue(initialValues?.startsAt),
+    toDateInputValue(initialValues?.startsAt),
   );
   const [endsAt, setEndsAt] = useState(
-    toDatetimeLocalValue(initialValues?.endsAt),
+    toDateInputValue(initialValues?.endsAt),
   );
   const [victims, setVictims] = useState<Option[]>([]);
   const [inmates, setInmates] = useState<Option[]>([]);
@@ -125,8 +124,16 @@ export function ProtectionOrderForm({
     setSaving(true);
 
     const radius = Number.parseInt(radiusMeters, 10);
-    if (!Number.isFinite(radius)) {
-      setError("Informe um raio válido em metros");
+    const watchRadius = Number.parseInt(watchRadiusMeters, 10);
+    if (!Number.isFinite(radius) || !Number.isFinite(watchRadius)) {
+      setError("Informe os raios em metros");
+      setSaving(false);
+      return;
+    }
+    if (watchRadius <= radius) {
+      setError(
+        "O raio de visualização do policial deve ser maior que o raio da vítima",
+      );
       setSaving(false);
       return;
     }
@@ -143,6 +150,7 @@ export function ProtectionOrderForm({
             victimId,
             inmateId,
             radiusMeters: radius,
+            watchRadiusMeters: watchRadius,
             isSimulation,
             judicialRef: judicialRef.trim(),
             startsAt: startsAt || undefined,
@@ -150,6 +158,7 @@ export function ProtectionOrderForm({
           }
         : {
             radiusMeters: radius,
+            watchRadiusMeters: watchRadius,
             isSimulation,
             judicialRef: judicialRef.trim(),
             startsAt: startsAt || undefined,
@@ -187,7 +196,7 @@ export function ProtectionOrderForm({
       if (onSuccess) {
         onSuccess(id);
       } else if (mode === "create") {
-        router.push(`/protection-orders/${id}`);
+        router.push(`/medidas-protetivas/${id}`);
       } else {
         router.refresh();
       }
@@ -203,19 +212,29 @@ export function ProtectionOrderForm({
       onCancel();
       return;
     }
-    router.push("/protection-orders");
+    router.push("/medidas-protetivas");
   }
 
   const createReady =
     victimId.length > 0 &&
     inmateId.length > 0 &&
     radiusMeters.trim().length > 0 &&
+    watchRadiusMeters.trim().length > 0 &&
     judicialRef.trim().length > 0 &&
     endsAt.trim().length > 0;
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="space-y-5">
+    <form
+      onSubmit={handleSubmit}
+      className={pinnedFooter ? "flex min-h-0 flex-1 flex-col" : undefined}
+    >
+      <div
+        className={
+          pinnedFooter
+            ? "min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4"
+            : "space-y-5"
+        }
+      >
         <div className="space-y-3">
           {mode === "create" ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -224,67 +243,58 @@ export function ProtectionOrderForm({
                   Vítima
                   <span className="ml-0.5 text-[#C62828]">*</span>
                 </Label>
-                <NativeSelect
+                <SearchableSelect
                   id="victimId"
                   value={victimId}
-                  onChange={(e) => setVictimId(e.target.value)}
-                  required
+                  onChange={setVictimId}
                   disabled={loadingOptions || saving}
-                  className="h-10"
-                >
-                  <option value="">
-                    {loadingOptions ? "Carregando..." : "Selecione a vítima"}
-                  </option>
-                  {victims.map((victim) => (
-                    <option key={victim.id} value={victim.id}>
-                      {victim.fullName}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  placeholder={loadingOptions ? "Carregando..." : "Selecione a vítima"}
+                  options={victims.map((victim) => ({
+                    value: victim.id,
+                    label: formatPersonName(victim.fullName),
+                  }))}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="inmateId" className="text-[#1B2A41]">
                   Preso
                   <span className="ml-0.5 text-[#C62828]">*</span>
                 </Label>
-                <NativeSelect
+                <SearchableSelect
                   id="inmateId"
                   value={inmateId}
-                  onChange={(e) => setInmateId(e.target.value)}
-                  required
+                  onChange={setInmateId}
                   disabled={loadingOptions || saving}
-                  className="h-10"
-                >
-                  <option value="">
-                    {loadingOptions ? "Carregando..." : "Selecione o preso"}
-                  </option>
-                  {inmates.map((inmate) => (
-                    <option key={inmate.id} value={inmate.id}>
-                      {inmate.fullName}
-                      {inmate.externalInmateId
-                        ? ` (${inmate.externalInmateId})`
-                        : ""}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  placeholder={loadingOptions ? "Carregando..." : "Selecione o preso"}
+                  options={inmates.map((inmate) => ({
+                    value: inmate.id,
+                    label: `${formatPersonName(inmate.fullName)}${
+                      inmate.externalInmateId ? ` (${inmate.externalInmateId})` : ""
+                    }`,
+                  }))}
+                />
               </div>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                <p className="ampara-kicker text-[11px] font-semibold uppercase tracking-wide">
                   Vítima
                 </p>
                 <p className="text-sm text-[#1B2A41]">
-                  {initialValues?.victim?.fullName ?? "—"}
+                  {initialValues?.victim?.fullName
+                    ? formatPersonName(initialValues.victim.fullName)
+                    : "—"}
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                <p className="ampara-kicker text-[11px] font-semibold uppercase tracking-wide">
                   Preso
                 </p>
                 <p className="text-sm text-[#1B2A41]">
-                  {initialValues?.inmate?.fullName ?? "—"}
+                  {initialValues?.inmate?.fullName
+                    ? formatPersonName(initialValues.inmate.fullName)
+                    : "—"}
                 </p>
               </div>
             </div>
@@ -292,7 +302,7 @@ export function ProtectionOrderForm({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="judicialRef" className="text-[#1B2A41]">
               Referência judicial
               <span className="ml-0.5 text-[#C62828]">*</span>
@@ -309,7 +319,7 @@ export function ProtectionOrderForm({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="radiusMeters" className="text-[#1B2A41]">
-              Raio (metros)
+              Raio da vítima (metros)
               <span className="ml-0.5 text-[#C62828]">*</span>
             </Label>
             <Input
@@ -323,6 +333,60 @@ export function ProtectionOrderForm({
               onChange={(e) => setRadiusMeters(e.target.value)}
               required
               className={fieldClass}
+            />
+            <p className="text-xs text-[#6B7280]">
+              Distância em que o app da vítima mostra o agressor e abre a
+              violação.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="watchRadiusMeters" className="text-[#1B2A41]">
+              Raio de visualização do policial (metros)
+              <span className="ml-0.5 text-[#C62828]">*</span>
+            </Label>
+            <Input
+              id="watchRadiusMeters"
+              type="number"
+              inputMode="numeric"
+              min={50}
+              max={50000}
+              step={1}
+              value={watchRadiusMeters}
+              onChange={(e) => setWatchRadiusMeters(e.target.value)}
+              required
+              className={fieldClass}
+            />
+            <p className="text-xs text-[#6B7280]">
+              A partir desta distância o Acompanhamento mostra o agressor para a
+              equipe. Precisa ser maior que o raio da vítima. Sugestão: 1000 m.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="startsAt" className="text-[#1B2A41]">
+              Início
+            </Label>
+            <DayField
+              id="startsAt"
+              value={startsAt}
+              onChange={setStartsAt}
+              label="Início"
+              disabled={saving}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="endsAt" className="text-[#1B2A41]">
+              Término
+              <span className="ml-0.5 text-[#C62828]">*</span>
+            </Label>
+            <DayField
+              id="endsAt"
+              value={endsAt}
+              onChange={setEndsAt}
+              label="Término"
+              disabled={saving}
             />
           </div>
         </div>
@@ -347,43 +411,20 @@ export function ProtectionOrderForm({
           </span>
         </label>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="startsAt" className="text-[#1B2A41]">
-              Início
-            </Label>
-            <Input
-              id="startsAt"
-              type="datetime-local"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              className={fieldClass}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="endsAt" className="text-[#1B2A41]">
-              Término
-              <span className="ml-0.5 text-[#C62828]">*</span>
-            </Label>
-            <Input
-              id="endsAt"
-              type="datetime-local"
-              value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)}
-              required
-              className={fieldClass}
-            />
-          </div>
-        </div>
+        {error ? (
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
       </div>
 
-      {error ? (
-        <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="-mx-5 mt-6 flex justify-end gap-2 border-t border-[#E5E7EB] bg-[#F8F9FB] px-5 py-3">
+      <div
+        className={
+          pinnedFooter
+            ? "flex shrink-0 justify-end gap-2 border-t border-[#E5E7EB] bg-[#F8F9FB] px-5 py-3"
+            : "-mx-5 mt-6 flex justify-end gap-2 border-t border-[#E5E7EB] bg-[#F8F9FB] px-5 py-3"
+        }
+      >
         <Button
           type="button"
           variant="outline"
@@ -397,7 +438,7 @@ export function ProtectionOrderForm({
           disabled={
             saving || (mode === "create" && (!createReady || loadingOptions))
           }
-          className="bg-[#1B2A41] text-white hover:bg-[#24364f]"
+          className="ampara-create"
         >
           {saving ? <Loader2 className="animate-spin" /> : null}
           {mode === "create" ? "Cadastrar" : "Salvar"}

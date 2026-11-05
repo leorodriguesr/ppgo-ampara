@@ -5,7 +5,7 @@ const PATH =
 
 /** Temporário: credenciais no código até irem para o secret do K8s. */
 const GUARDIAO_API_TOKEN =
-  "hr5mffm3v23gb4g2lkwiy3bkzco8jv7kv660cr1b9f3axp1l44nocaqkj6a5a5ss";
+  "riv8tumjlg15a31jswahycft3mrmh2gzuxvavma9csuab11azapc9o9b0j84sjqs";
 const GUARDIAO_DEVICE_KEY = "e118ec7b-dc3d-43f1-8ff3-28ec0c3fd5e6";
 
 const GUARDIAO = {

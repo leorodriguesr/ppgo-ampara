@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
+import { PoliciaPenalMark } from "@/components/brand/policia-penal-mark";
 import { APP_NAME } from "@/config/sistema";
 import { getUrlLogin } from "@/lib/sso/auth-api";
 
@@ -12,17 +13,13 @@ export function RedirectSSO() {
   }, []);
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-background px-4">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-        <ShieldCheck className="size-6" />
-      </div>
+    <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-[#F3F4F6] px-4">
+      <PoliciaPenalMark size={72} />
       <div className="text-center">
-        <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Redirecionando para o SSO...
-        </p>
+        <p className="text-lg font-semibold text-[#1B2A41]">{APP_NAME}</p>
+        <p className="mt-1 text-sm text-[#4B5563]">Redirecionando para o SSO…</p>
       </div>
-      <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      <Loader2 className="size-5 animate-spin text-[#1B2A41]" />
     </div>
   );
 }

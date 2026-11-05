@@ -14,8 +14,7 @@ export default function AuditPage() {
   return (
     <ComingSoon
       title="Auditoria"
-      description="Trilha de auditoria de ações sensíveis do sistema (somente ADMIN)."
-      stage="ETAPA 2+"
+      description="O registro das ações do sistema ainda não está disponível nesta versão."
     />
   );
 }

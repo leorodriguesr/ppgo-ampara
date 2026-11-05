@@ -1,5 +1,6 @@
 import type {
   GeofenceState,
+  LookupStatus,
   Prisma,
   ProtectionOrderStatus,
 } from "@/generated/prisma/client";
@@ -45,6 +46,7 @@ export async function createProtectionOrder(data: {
   victimId: string;
   inmateId: string;
   radiusMeters: number;
+  watchRadiusMeters?: number;
   isSimulation?: boolean;
   judicialRef: string;
   startsAt?: Date;
@@ -56,6 +58,7 @@ export async function createProtectionOrder(data: {
       victimId: data.victimId,
       inmateId: data.inmateId,
       radiusMeters: data.radiusMeters,
+      watchRadiusMeters: data.watchRadiusMeters ?? 1000,
       isSimulation: data.isSimulation ?? true,
       judicialRef: data.judicialRef,
       startsAt: data.startsAt,
@@ -71,6 +74,7 @@ export async function updateProtectionOrder(
   id: string,
   data: {
     radiusMeters?: number;
+    watchRadiusMeters?: number;
     isSimulation?: boolean;
     judicialRef?: string | null;
     startsAt?: Date | null;
@@ -100,8 +104,15 @@ export async function findExpiredOpenProtectionOrders(now = new Date()) {
     where: {
       status: { not: "CLOSED" },
       endsAt: { lte: now },
+      geofenceState: { notIn: ["VIOLATING", "PENDING_SAFE"] },
     },
-    select: { id: true, publicId: true, status: true, endsAt: true },
+    select: {
+      id: true,
+      publicId: true,
+      status: true,
+      endsAt: true,
+      geofenceState: true,
+    },
   });
 }
 
@@ -158,6 +169,12 @@ export async function updateProtectionOrderGeofence(
     pendingCount: number;
     lastCheckAt: Date;
     lastDistanceM: number | null;
+    lastInmateLatitude?: number | null;
+    lastInmateLongitude?: number | null;
+    lastInmateAt?: Date | null;
+    lookupStatus?: LookupStatus;
+    lastContactAt?: Date;
+    lastGpsAt?: Date | null;
   },
 ) {
   return prisma.protectionOrder.update({
@@ -167,8 +184,35 @@ export async function updateProtectionOrderGeofence(
       pendingCount: data.pendingCount,
       lastCheckAt: data.lastCheckAt,
       lastDistanceM: data.lastDistanceM,
+      ...(data.lastInmateLatitude !== undefined
+        ? { lastInmateLatitude: data.lastInmateLatitude }
+        : {}),
+      ...(data.lastInmateLongitude !== undefined
+        ? { lastInmateLongitude: data.lastInmateLongitude }
+        : {}),
+      ...(data.lastInmateAt !== undefined
+        ? { lastInmateAt: data.lastInmateAt }
+        : {}),
+      ...(data.lookupStatus !== undefined
+        ? { lookupStatus: data.lookupStatus }
+        : {}),
+      ...(data.lastContactAt !== undefined
+        ? { lastContactAt: data.lastContactAt }
+        : {}),
+      ...(data.lastGpsAt !== undefined ? { lastGpsAt: data.lastGpsAt } : {}),
     },
     include: orderInclude,
+  });
+}
+
+export async function touchProtectionOrderContact(
+  id: string,
+  data: { lastContactAt: Date; lastGpsAt?: Date },
+) {
+  return prisma.protectionOrder.update({
+    where: { id },
+    data,
+    select: { id: true, lastContactAt: true, lastGpsAt: true },
   });
 }
 
@@ -223,6 +267,9 @@ export async function deleteProtectionOrdersCascade(
   if (orderIds.length === 0) return;
 
   await tx.alert.deleteMany({
+    where: { protectionOrderId: { in: orderIds } },
+  });
+  await tx.trackingPoint.deleteMany({
     where: { protectionOrderId: { in: orderIds } },
   });
   await tx.victimLocation.deleteMany({

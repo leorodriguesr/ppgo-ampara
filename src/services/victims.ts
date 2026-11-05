@@ -1,4 +1,5 @@
 import { NotFoundError } from "@/lib/errors";
+import { addressColumns } from "@/modules/address";
 import type {
   CreateVictimInput,
   UpdateVictimInput,
@@ -27,8 +28,8 @@ export async function createVictimService(
     fullName: input.fullName,
     phone: input.phone,
     document: input.document,
-    notes: input.notes,
     createdById: actorUserId,
+    ...addressColumns(input),
   });
 
   await writeAuditLog({
@@ -64,7 +65,7 @@ export async function updateVictimService(
     phone: input.phone === undefined ? undefined : (input.phone ?? null),
     document:
       input.document === undefined ? undefined : (input.document ?? null),
-    notes: input.notes === undefined ? undefined : (input.notes ?? null),
+    ...addressColumns(input),
   });
 
   await writeAuditLog({

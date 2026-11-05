@@ -24,11 +24,16 @@ export function jsonError(error: unknown) {
   }
 
   if (error instanceof ZodError) {
+    const details = error.flatten();
+    const fieldMessage = Object.values(details.fieldErrors)
+      .flat()
+      .find((item) => item);
     return NextResponse.json(
       {
         code: "VALIDATION_ERROR",
-        message: "Dados inválidos",
-        details: error.flatten(),
+        message:
+          fieldMessage || details.formErrors[0] || "Dados inválidos",
+        details,
       },
       { status: 400 },
     );

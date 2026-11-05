@@ -8,8 +8,8 @@ import type {
  *
  * - enterThreshold = raio da medida (ex.: 300) — no limite já conta como dentro
  * - exitThreshold  = raio + histerese (ex.: 320) — evita oscilar ao sair
- * - Abre alerta só após `requiredConsecutiveHits` leituras ≤ enter
- * - Resolve só após `requiredConsecutiveHits` leituras ≥ exit
+ * - Abre alerta na primeira leitura ≤ enter
+ * - Resolve na primeira leitura ≥ exit (raio + histerese)
  */
 export function evaluateGeofence(
   input: GeofenceEvaluationInput,

@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { addressColumns, type AddressInput } from "@/modules/address";
 import { deleteProtectionOrdersCascade } from "@/repositories/protection-order.repository";
 
 export type VictimListParams = {
@@ -8,20 +9,21 @@ export type VictimListParams = {
   pageSize?: number;
 };
 
-export async function createVictim(data: {
-  fullName: string;
-  phone?: string;
-  document?: string;
-  notes?: string;
-  createdById: string;
-}) {
+export async function createVictim(
+  data: {
+    fullName: string;
+    phone?: string;
+    document?: string;
+    createdById: string;
+  } & Partial<AddressInput>,
+) {
   return prisma.victim.create({
     data: {
       fullName: data.fullName,
       phone: data.phone,
       document: data.document,
-      notes: data.notes,
       createdById: data.createdById,
+      ...addressColumns(data),
     },
     include: {
       createdBy: {
@@ -38,8 +40,7 @@ export async function updateVictim(
     fullName?: string;
     phone?: string | null;
     document?: string | null;
-    notes?: string | null;
-  },
+  } & Partial<AddressInput>,
 ) {
   return prisma.victim.update({
     where: { id },
@@ -64,9 +65,12 @@ export async function findVictimById(id: string) {
         select: {
           id: true,
           publicId: true,
+          judicialRef: true,
           status: true,
           radiusMeters: true,
+          watchRadiusMeters: true,
           createdAt: true,
+          inmate: { select: { fullName: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 10,

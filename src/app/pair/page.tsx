@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Smartphone } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -71,13 +71,10 @@ function PairForm() {
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-          <Smartphone className="size-6" />
-        </div>
-        <CardTitle>Pareamento (teste web)</CardTitle>
+      <CardHeader>
+        <CardTitle>Pareamento de teste</CardTitle>
         <CardDescription>
-          Simula o redeem do app da vítima. Use o token gerado no painel.
+          Usa o token gerado no painel para simular o app da vítima.
         </CardDescription>
       </CardHeader>
       <CardContent>

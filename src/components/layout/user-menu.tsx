@@ -44,13 +44,17 @@ export function UserMenu({
       <DropdownMenuTrigger
         className={
           sidebar
-            ? "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/30"
+            ? "flex w-full items-center gap-2.5 rounded-lg border border-[#E5E7EB] bg-[#F8F9FB] px-2 py-2 text-left outline-none hover:bg-[#F3F4F6] focus-visible:ring-2 focus-visible:ring-[#C5CDD6] dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/8 dark:focus-visible:ring-white/20"
             : "inline-flex h-auto items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         }
       >
         <Avatar className="size-8">
           <AvatarFallback
-            className={sidebar ? "bg-white/15 text-white text-xs" : undefined}
+            className={
+              sidebar
+                ? "bg-[#1B2A41]/10 text-xs text-[#1B2A41] dark:bg-white/10 dark:text-white"
+                : undefined
+            }
           >
             {initials(name)}
           </AvatarFallback>
@@ -59,7 +63,7 @@ export function UserMenu({
           <span
             className={
               sidebar
-                ? "block truncate text-[13px] font-medium leading-tight text-white"
+                ? "block truncate text-[13px] font-medium leading-tight text-[#1B2A41] dark:text-white"
                 : "block text-sm font-medium leading-tight"
             }
           >
@@ -68,7 +72,7 @@ export function UserMenu({
           <span
             className={
               sidebar
-                ? "block truncate text-[11px] text-white/55"
+                ? "block truncate text-[11px] text-[#6B7280] dark:text-white/55"
                 : "block text-xs text-muted-foreground"
             }
           >

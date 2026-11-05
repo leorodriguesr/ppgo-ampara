@@ -2,17 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import { AlertStatusBadge } from "@/components/alerts/alert-status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
 
@@ -106,133 +99,132 @@ export function AlertsList() {
   }
 
   return (
-    <Card>
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Bell className="size-5" />
-              Alertas de proximidade
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Violações detectadas pelo motor de geofence.
-            </CardDescription>
-          </div>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold text-[#1B2A41]">Alertas</h1>
+        <p className="text-sm text-[#4B5563]">
+          {result
+            ? `${result.total} registro${result.total === 1 ? "" : "s"}`
+            : "Carregando…"}
+        </p>
+      </div>
+
+      <form
+        onSubmit={applyFilters}
+        className="flex max-w-3xl flex-col gap-2 border border-[#D8DEE6] px-3 py-2.5 sm:flex-row"
+      >
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-[#9CA3AF]" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Vítima, preso ou medida"
+            className="h-9 bg-white pl-8"
+          />
         </div>
-
-        <form
-          onSubmit={applyFilters}
-          className="flex flex-col gap-2 sm:flex-row"
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="h-9 border border-[#D8DEE6] bg-white px-3 text-sm text-[#1B2A41]"
+          aria-label="Filtrar por status"
         >
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por vítima, preso ou medida..."
-              className="pl-9"
-            />
-          </div>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="h-9 rounded-lg border bg-background px-3 text-sm"
-          >
-            {STATUS_FILTERS.map((item) => (
-              <option key={item.value || "all"} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <Button type="submit">Filtrar</Button>
-        </form>
-      </CardHeader>
+          {STATUS_FILTERS.map((item) => (
+            <option key={item.value || "all"} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <Button type="submit" variant="outline" size="sm">
+          Filtrar
+        </Button>
+      </form>
 
-      <CardContent className="space-y-3">
-        {loading ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Carregando alertas...
-          </p>
-        ) : null}
+      {error ? <p className="text-sm text-[#B42318]">{error}</p> : null}
+      {loading ? <p className="py-8 text-sm text-[#4B5563]">Carregando…</p> : null}
+      {!loading && !error && result?.data.length === 0 ? (
+        <p className="py-8 text-sm text-[#4B5563]">Nenhum alerta encontrado.</p>
+      ) : null}
 
-        {error ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-
-        {!loading && !error && result?.data.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Nenhum alerta encontrado.
-          </p>
-        ) : null}
-
-        <ul className="divide-y rounded-lg border">
-          {result?.data.map((alert) => (
-            <li key={alert.id}>
-              <Link
-                href={`/alerts/${alert.id}`}
-                className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
+      {!loading && result && result.data.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="ampara-thead text-[12px] font-medium">
+              <tr className="border-b border-[#E5E7EB]">
+                <th className="py-2 pr-4 pl-3 font-medium">Situação</th>
+                <th className="py-2 pr-4 font-medium">Vítima</th>
+                <th className="py-2 pr-4 font-medium">Preso</th>
+                <th className="py-2 pr-4 font-medium">Medida</th>
+                <th className="py-2 pr-4 font-medium">Distância</th>
+                <th className="py-2 pr-3 font-medium">Aberto em</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.data.map((alert) => (
+                <tr
+                  key={alert.id}
+                  className="border-b border-[#E5E7EB] last:border-b-0"
+                >
+                  <td className="py-3 pr-4 pl-3">
                     <AlertStatusBadge status={alert.status} />
-                    <span className="font-medium">
-                      {alert.protectionOrder?.victim?.fullName ?? "Vítima"}
-                      {" · "}
-                      {alert.protectionOrder?.inmate?.fullName ?? "Preso"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Medida{" "}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <Link
+                      href={`/alerts/${alert.id}`}
+                      className="font-medium text-[#1B2A41] hover:underline"
+                    >
+                      {alert.protectionOrder?.victim?.fullName ?? "—"}
+                    </Link>
+                  </td>
+                  <td className="py-3 pr-4 text-[#4B5563]">
+                    {alert.protectionOrder?.inmate?.fullName ?? "—"}
+                  </td>
+                  <td className="py-3 pr-4 text-[#4B5563]">
                     {alert.protectionOrder?.judicialRef ||
                       alert.protectionOrder?.publicId ||
                       "—"}
-                    {" · "}
-                    Distância {Math.round(alert.lastDistanceM)} m
-                    {" · "}
-                    Aberto em {formatDate(alert.openedAt)}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {alert.publicId.slice(0, 8)}…
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  </td>
+                  <td className="py-3 pr-4 text-[#4B5563]">
+                    {Math.round(alert.lastDistanceM)} m
+                  </td>
+                  <td className="py-3 pr-3 text-[#6B7280]">
+                    {formatDate(alert.openedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
-        {result && result.totalPages > 1 ? (
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-xs text-muted-foreground">
-              Página {result.page} de {result.totalPages} · {result.total}{" "}
-              alerta(s)
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft data-icon="inline-start" />
-                Anterior
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page >= result.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Próxima
-                <ChevronRight data-icon="inline-end" />
-              </Button>
-            </div>
+      {result && result.totalPages > 1 ? (
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-xs text-[#6B7280]">
+            Página {result.page} de {result.totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft data-icon="inline-start" />
+              Anterior
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page >= result.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Próxima
+              <ChevronRight data-icon="inline-end" />
+            </Button>
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </div>
+      ) : null}
+    </div>
   );
 }

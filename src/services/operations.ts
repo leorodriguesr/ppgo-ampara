@@ -1,9 +1,19 @@
 import { haversineDistanceMeters } from "@/lib/geo";
 import { prisma } from "@/lib/prisma";
+import {
+  assessDeviceSignal,
+  expectedIntervalSeconds,
+  zoneFromLookup,
+  type DeviceSignal,
+} from "@/services/proximity-policy";
 import { getMockInmateLocation } from "@/integrations/ankle-monitor/mock-store";
-import type { OperationsPoint, OperationsTrack } from "@/types/operations";
+import type {
+  OperationsPoint,
+  OperationsTrack,
+  OperationsZone,
+} from "@/types/operations";
 
-export type { OperationsPoint, OperationsTrack };
+export type { OperationsPoint, OperationsTrack, OperationsZone };
 
 const STATE_RANK: Record<string, number> = {
   VIOLATING: 0,
@@ -12,40 +22,53 @@ const STATE_RANK: Record<string, number> = {
   SAFE: 3,
 };
 
-export async function getOperationsBoard(): Promise<{
-  tracks: OperationsTrack[];
-  violatingCount: number;
-  monitoredCount: number;
-}> {
-  const orders = await prisma.protectionOrder.findMany({
-    where: { status: "ACTIVE" },
-    include: {
-      victim: { select: { fullName: true } },
-      inmate: { select: { fullName: true, externalInmateId: true } },
-      victimLocations: {
-        orderBy: { recordedAt: "desc" },
-        take: 1,
-        select: {
-          latitude: true,
-          longitude: true,
-          recordedAt: true,
-        },
-      },
-      alerts: {
-        where: { status: "OPEN" },
-        orderBy: { openedAt: "desc" },
-        take: 1,
-        select: {
-          id: true,
-          inmateLatitude: true,
-          inmateLongitude: true,
-          updatedAt: true,
-        },
-      },
+const boardInclude = {
+  victim: { select: { fullName: true, phone: true } },
+  inmate: { select: { fullName: true, externalInmateId: true } },
+  victimLocations: {
+    orderBy: { recordedAt: "desc" as const },
+    take: 1,
+    select: {
+      latitude: true,
+      longitude: true,
+      recordedAt: true,
     },
-  });
+  },
+  alerts: {
+    where: { status: "OPEN" as const },
+    orderBy: { openedAt: "desc" as const },
+    take: 1,
+    select: {
+      id: true,
+      inmateLatitude: true,
+      inmateLongitude: true,
+      updatedAt: true,
+    },
+  },
+  devices: {
+    where: { status: "ACTIVE" as const },
+    orderBy: { lastSeenAt: "desc" as const },
+    take: 1,
+    select: { lastSeenAt: true, backgroundEnabled: true },
+  },
+};
 
-  const tracks = orders.map((order) => {
+async function queryBoardOrders(orderId?: string) {
+  return prisma.protectionOrder.findMany({
+    where: {
+      status: "ACTIVE",
+      ...(orderId ? { id: orderId } : {}),
+    },
+    include: boardInclude,
+  });
+}
+
+function buildTracks(
+  orders: Awaited<ReturnType<typeof queryBoardOrders>>,
+): OperationsTrack[] {
+  const tracks = orders.flatMap((order) => {
+    if (!order.victim || !order.inmate) return [];
+
     const lastVictim = order.victimLocations[0] ?? null;
     const victimLocation: OperationsPoint | null = lastVictim
       ? {
@@ -67,6 +90,19 @@ export async function getOperationsBoard(): Promise<{
         latitude: mockInmate.latitude,
         longitude: mockInmate.longitude,
         recordedAt: mockInmate.updatedAt,
+      };
+    } else if (
+      order.lastInmateLatitude != null &&
+      order.lastInmateLongitude != null
+    ) {
+      inmateLocation = {
+        latitude: order.lastInmateLatitude,
+        longitude: order.lastInmateLongitude,
+        recordedAt: (
+          order.lastInmateAt ??
+          order.lastCheckAt ??
+          order.updatedAt
+        ).toISOString(),
       };
     } else if (
       openAlert &&
@@ -94,21 +130,61 @@ export async function getOperationsBoard(): Promise<{
       );
     }
 
+    const distanceMeters =
+      distance != null && Number.isFinite(distance) ? distance : null;
+    const zone = zoneFromLookup({
+      lookupStatus: order.lookupStatus,
+      geofenceState: order.geofenceState,
+      distanceMeters:
+        order.lookupStatus === "OUT_OF_WINDOW" &&
+        order.geofenceState !== "VIOLATING" &&
+        order.geofenceState !== "PENDING_SAFE"
+          ? null
+          : distanceMeters,
+      radiusMeters: order.radiusMeters,
+      watchRadiusMeters: order.watchRadiusMeters,
+    });
+    const shownDistance =
+      zone === "clear" && order.lookupStatus === "OUT_OF_WINDOW"
+        ? null
+        : distanceMeters;
+    const device = order.devices[0] ?? null;
+    const lastContactAt = order.lastContactAt ?? device?.lastSeenAt ?? null;
+    const signal: DeviceSignal = assessDeviceSignal({
+      now: new Date(),
+      lastContactAt,
+      lastGpsAt: order.lastGpsAt,
+      expectedSeconds: expectedIntervalSeconds(zone),
+      backgroundEnabled: device?.backgroundEnabled ?? null,
+    });
+
+    if (zone === "clear") {
+      inmateLocation = null;
+    }
+
     return {
       orderId: order.id,
       publicId: order.publicId,
       judicialRef: order.judicialRef,
       radiusMeters: order.radiusMeters,
+      watchRadiusMeters: order.watchRadiusMeters,
       geofenceState: order.geofenceState,
-      lastDistanceM:
-        distance != null && Number.isFinite(distance) ? distance : null,
+      zone,
+      lastDistanceM: shownDistance,
       lastCheckAt: order.lastCheckAt?.toISOString() ?? null,
+      lastContactAt: lastContactAt?.toISOString() ?? null,
+      lastGpsAt: order.lastGpsAt?.toISOString() ?? null,
+      lookupStatus: order.lookupStatus,
+      signal,
+      distanceFresh: order.lookupStatus === "OK",
       victim: {
         name: order.victim.fullName,
+        phone: order.victim.phone,
         location: victimLocation,
       },
       inmate: {
         name: order.inmate.fullName,
+        phone: null,
         location: inmateLocation,
       },
       alertId: openAlert?.id ?? null,
@@ -122,10 +198,38 @@ export async function getOperationsBoard(): Promise<{
     return (b.lastCheckAt ?? "").localeCompare(a.lastCheckAt ?? "");
   });
 
+  return tracks;
+}
+
+export async function getOperationsBoard(options?: {
+  includeClear?: boolean;
+}): Promise<{
+  tracks: OperationsTrack[];
+  violatingCount: number;
+  watchCount: number;
+  clearCount: number;
+  monitoredCount: number;
+  silentCount: number;
+  signals: OperationsTrack[];
+}> {
+  const tracks = buildTracks(await queryBoardOrders());
+  const visible = options?.includeClear
+    ? tracks
+    : tracks.filter((track) => track.zone !== "clear");
+  const signals = tracks.filter((track) => track.signal !== "ok");
+
   return {
-    tracks,
-    violatingCount: tracks.filter((track) => track.geofenceState === "VIOLATING")
-      .length,
+    tracks: visible,
+    violatingCount: tracks.filter((track) => track.zone === "violation").length,
+    watchCount: tracks.filter((track) => track.zone === "watch").length,
+    clearCount: tracks.filter((track) => track.zone === "clear").length,
     monitoredCount: tracks.length,
+    silentCount: signals.length,
+    signals,
   };
+}
+
+export async function getOperationsTrack(orderId: string) {
+  const tracks = buildTracks(await queryBoardOrders(orderId));
+  return tracks[0] ?? null;
 }

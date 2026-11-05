@@ -14,6 +14,12 @@ export const proximityCheckBodySchema = z.object({
   appState: z.enum(["foreground", "background"]).optional(),
   deviceBrand: z.string().trim().max(80).optional(),
   deviceModel: z.string().trim().max(120).optional(),
+  backgroundEnabled: z.boolean().optional(),
+});
+
+export const heartbeatBodySchema = z.object({
+  gpsOk: z.boolean(),
+  backgroundEnabled: z.boolean(),
 });
 
 export const proximityTestBodySchema = z.object({

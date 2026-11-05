@@ -7,6 +7,7 @@ import {
 import { proximityCheckBodySchema } from "@/modules/proximity";
 import { touchDeviceLastSeen } from "@/repositories/device.repository";
 import { checkProximityService } from "@/services/proximity";
+import { scheduleVictimLocationPurge } from "@/services/retention";
 
 export async function POST(request: Request) {
   try {
@@ -14,12 +15,19 @@ export async function POST(request: Request) {
     const meta = await getRequestMeta();
     const body = proximityCheckBodySchema.parse(await request.json());
 
-    if (body.deviceBrand || body.deviceModel) {
+    if (
+      body.deviceBrand ||
+      body.deviceModel ||
+      body.backgroundEnabled !== undefined
+    ) {
       await touchDeviceLastSeen(device.id, {
         deviceBrand: body.deviceBrand,
         deviceModel: body.deviceModel,
+        backgroundEnabled: body.backgroundEnabled,
       });
     }
+
+    scheduleVictimLocationPurge();
 
     const result = await checkProximityService({
       device,

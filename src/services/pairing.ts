@@ -4,7 +4,7 @@ import { rateLimitsConfig } from "@/config/rate-limits";
 import { retentionConfig } from "@/config/retention";
 import { getAppOrigin } from "@/config/sistema";
 import { generateOpaqueToken, hashToken } from "@/lib/crypto";
-import { AppError, NotFoundError } from "@/lib/errors";
+import { AppError, ConflictError, NotFoundError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import type {
   GeneratePairingInput,
@@ -23,7 +23,10 @@ import {
   revokePendingPairingTokens,
 } from "@/repositories/pairing-token.repository";
 import { findProtectionOrderById } from "@/repositories/protection-order.repository";
-import { ensureProtectionOrderNotExpired } from "@/services/protection-order-expiry";
+import {
+  ensureProtectionOrderNotExpired,
+  isViolationOpen,
+} from "@/services/protection-order-expiry";
 import { writeAuditLog } from "@/services/write-audit-log";
 
 type AuditMeta = {
@@ -339,6 +342,12 @@ export async function revokeDeviceAccessService(
       "ORDER_CLOSED",
       "Medida encerrada; não é possível alterar o acesso do app",
       400,
+    );
+  }
+
+  if (await isViolationOpen(order)) {
+    throw new ConflictError(
+      "Não é possível desconectar o aparelho enquanto a violação estiver em andamento.",
     );
   }
 

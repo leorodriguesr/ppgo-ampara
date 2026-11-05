@@ -1,15 +1,31 @@
+import { violationBlocksClosure } from "@/lib/protection-order-violation";
+import { vigenciaEnded } from "@/lib/vigencia-day";
 import {
   closeProtectionOrdersByIds,
   findExpiredOpenProtectionOrders,
   updateProtectionOrderStatus,
 } from "@/repositories/protection-order.repository";
+import { findLastTrackingPoint } from "@/repositories/tracking-point.repository";
 import { writeAuditLog } from "@/services/write-audit-log";
+
+/**
+ * Violação confirmada no estado da medida, ou episódio do livro ainda sem ponto de saída.
+ */
+export async function isViolationOpen(order: {
+  id: string;
+  geofenceState: string;
+}) {
+  if (violationBlocksClosure(order.geofenceState)) return true;
+  const last = await findLastTrackingPoint(order.id);
+  return last?.zone === "VIOLATION";
+}
 
 type OrderWithExpiry = {
   id: string;
   publicId: string;
   status: string;
   endsAt: Date | null;
+  geofenceState: string;
 };
 
 /**
@@ -20,10 +36,18 @@ export async function expireDueProtectionOrders(): Promise<number> {
   const due = await findExpiredOpenProtectionOrders();
   if (due.length === 0) return 0;
 
-  await closeProtectionOrdersByIds(due.map((order) => order.id));
+  const closable = [];
+  for (const order of due) {
+    if (!order.endsAt || !vigenciaEnded(order.endsAt)) continue;
+    if (await isViolationOpen(order)) continue;
+    closable.push(order);
+  }
+  if (closable.length === 0) return 0;
+
+  await closeProtectionOrdersByIds(closable.map((order) => order.id));
 
   await Promise.all(
-    due.map((order) =>
+    closable.map((order) =>
       writeAuditLog({
         actorType: "SYSTEM",
         action: "PROTECTION_ORDER_STATUS_CHANGED",
@@ -40,7 +64,7 @@ export async function expireDueProtectionOrders(): Promise<number> {
     ),
   );
 
-  return due.length;
+  return closable.length;
 }
 
 /**
@@ -54,7 +78,12 @@ export async function ensureProtectionOrderNotExpired<T extends OrderWithExpiry>
     return order;
   }
 
-  if (order.endsAt.getTime() > Date.now()) {
+  if (!vigenciaEnded(order.endsAt)) {
+    return order;
+  }
+
+  // O prazo judicial já passou, mas a violação ainda não terminou.
+  if (await isViolationOpen(order)) {
     return order;
   }
 

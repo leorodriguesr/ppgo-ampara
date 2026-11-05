@@ -1,7 +1,11 @@
 import { getGuardiaoEndpoints } from "@/config/guardiao";
 import { haversineDistanceMeters } from "@/lib/geo";
 
-import { AnkleMonitorApiError, AnkleMonitorTimeoutError } from "./errors";
+import {
+  AnkleMonitorApiError,
+  AnkleMonitorTimeoutError,
+  InmateOutOfWindowError,
+} from "./errors";
 import type { LocalizarRequest, LocalizarResponse } from "./types";
 
 const LIVE_TIMEOUT_MS = 8_000;
@@ -48,14 +52,6 @@ function guardiaoConfig() {
     deviceKey: deviceKey.trim(),
     origin,
   };
-}
-
-function redactHeaders(headers: Record<string, string>) {
-  const logged: Record<string, string> = { ...headers };
-  if (logged.Authorization) {
-    logged.Authorization = `Bearer *** (${headers.Authorization.length} chars)`;
-  }
-  return logged;
 }
 
 function logGuardiao(message: string, extra?: unknown) {
@@ -109,14 +105,6 @@ export async function localizarNoGuardiao(
       headers["x-device-key"] = deviceKey;
     }
 
-    logGuardiao("request GET", {
-      url,
-      headers: redactHeaders(headers),
-      idDetento: request.idDetento,
-      latitudeVitima: request.latitude,
-      longitudeVitima: request.longitude,
-    });
-
     const response = await fetch(url, {
       method: "GET",
       headers,
@@ -144,16 +132,6 @@ export async function localizarNoGuardiao(
     }
 
     const pessoas = extractPessoas(payload);
-    const envelope =
-      payload && typeof payload === "object" && !Array.isArray(payload)
-        ? (payload as { resposta_codigo?: number; resposta_msg?: string })
-        : null;
-    logGuardiao(`response ${response.status}`, {
-      ok: true,
-      resposta_codigo: envelope?.resposta_codigo ?? null,
-      resposta_msg: envelope?.resposta_msg ?? null,
-      totalPessoas: pessoas.length,
-    });
 
     const wanted = normalizeIdent(request.idDetento);
     const match = pessoas.find((pessoa) => {
@@ -162,24 +140,8 @@ export async function localizarNoGuardiao(
       return tipo === "MONITORADO" && ident === wanted;
     });
 
-    logGuardiao("filtro", {
-      total: pessoas.length,
-      wanted,
-      encontrado: Boolean(match),
-      match: match
-        ? {
-            pessoa_tipo: match.pessoa_tipo,
-            pessoa_ident: match.pessoa_ident,
-            latitude: match.latitude,
-            longitude: match.longitude,
-          }
-        : null,
-    });
-
     if (!match) {
-      throw new AnkleMonitorApiError(
-        "Monitorado não encontrado no mapa do Guardião",
-      );
+      throw new InmateOutOfWindowError();
     }
 
     const latitudePreso = parseCoord(match.latitude);

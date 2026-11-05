@@ -6,13 +6,6 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { AlertStatusBadge } from "@/components/alerts/alert-status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/format";
@@ -120,21 +113,20 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
   }
 
   if (loading) {
-    return (
-      <p className="py-10 text-center text-sm text-muted-foreground">
-        Carregando alerta...
-      </p>
-    );
+    return <p className="py-8 text-sm text-[#4B5563]">Carregando…</p>;
   }
 
   if (error || !alert) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" render={<Link href="/alerts" />}>
-          <ArrowLeft data-icon="inline-start" />
-          Voltar para alertas
-        </Button>
-        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <div className="space-y-3">
+        <Link
+          href="/alerts"
+          className="inline-flex items-center gap-1 text-sm text-[#4B5563] hover:text-[#1B2A41]"
+        >
+          <ArrowLeft className="size-3.5" />
+          Alertas
+        </Link>
+        <p className="text-sm text-[#B42318]">
           {error ?? "Alerta não encontrado"}
         </p>
       </div>
@@ -142,150 +134,140 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <Button variant="ghost" size="sm" render={<Link href="/alerts" />}>
-            <ArrowLeft data-icon="inline-start" />
-            Voltar para alertas
-          </Button>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Alerta de proximidade
+    <div className="max-w-3xl space-y-5">
+      <div>
+        <Link
+          href="/alerts"
+          className="inline-flex items-center gap-1 text-sm text-[#4B5563] hover:text-[#1B2A41]"
+        >
+          <ArrowLeft className="size-3.5" />
+          Alertas
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <h1 className="text-lg font-semibold text-[#1B2A41]">
+            {alert.protectionOrder?.victim?.fullName ?? "Alerta"}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            ID público {alert.publicId} · aberto em {formatDate(alert.openedAt)}
-          </p>
+          <AlertStatusBadge status={alert.status} />
         </div>
-        <AlertStatusBadge status={alert.status} />
+        <p className="mt-1 text-sm text-[#4B5563]">
+          Aberto em {formatDate(alert.openedAt)}
+          {alert.resolvedAt ? ` · resolvido em ${formatDate(alert.resolvedAt)}` : ""}
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Medida e pessoas</CardTitle>
-          <CardDescription>
-            Vínculo com a medida protetiva que gerou o alerta.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">Vítima</p>
-            <p className="font-medium">
+      <section className="border border-[#D8DEE6]">
+        <h2 className="border-b border-[#E5E7EB] px-4 py-2.5 text-sm font-semibold text-[#1B2A41]">
+          Pessoas e medida
+        </h2>
+        <dl className="grid gap-x-8 gap-y-4 px-4 py-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-[#6B7280]">Vítima</dt>
+            <dd className="text-sm font-medium text-[#1B2A41]">
               {alert.protectionOrder?.victim?.fullName ?? "—"}
-            </p>
+            </dd>
           </div>
-          <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">Preso</p>
-            <p className="font-medium">
+          <div>
+            <dt className="text-xs text-[#6B7280]">Preso</dt>
+            <dd className="text-sm font-medium text-[#1B2A41]">
               {alert.protectionOrder?.inmate?.fullName ?? "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {alert.protectionOrder?.inmate?.externalInmateId}
-            </p>
+            </dd>
+            {alert.protectionOrder?.inmate?.externalInmateId ? (
+              <dd className="font-mono text-xs text-[#6B7280]">
+                {alert.protectionOrder.inmate.externalInmateId}
+              </dd>
+            ) : null}
           </div>
-          <div className="rounded-lg border px-3 py-2 sm:col-span-2">
-            <p className="text-xs text-muted-foreground">Medida</p>
-            {alert.protectionOrder ? (
-              <Link
-                href={`/protection-orders/${alert.protectionOrder.id}`}
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {alert.protectionOrder.judicialRef ||
-                  alert.protectionOrder.publicId}
-              </Link>
-            ) : (
-              <p className="font-medium">—</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Raio {alert.protectionOrder?.radiusMeters ?? "—"} m · geofence{" "}
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-[#6B7280]">Medida</dt>
+            <dd className="text-sm font-medium text-[#1B2A41]">
+              {alert.protectionOrder ? (
+                <Link
+                  href={`/medidas-protetivas/${alert.protectionOrder.id}`}
+                  className="underline-offset-2 hover:underline"
+                >
+                  {alert.protectionOrder.judicialRef ||
+                    alert.protectionOrder.publicId}
+                </Link>
+              ) : (
+                "—"
+              )}
+            </dd>
+            <dd className="text-xs text-[#6B7280]">
+              Raio {alert.protectionOrder?.radiusMeters ?? "—"} m ·{" "}
               {alert.protectionOrder?.geofenceState ?? "—"}
-            </p>
+            </dd>
           </div>
-        </CardContent>
-      </Card>
+        </dl>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Distâncias e coordenadas</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">Distância no disparo</p>
-            <p className="font-medium">
+      <section className="border border-[#D8DEE6]">
+        <h2 className="border-b border-[#E5E7EB] px-4 py-2.5 text-sm font-semibold text-[#1B2A41]">
+          Posição
+        </h2>
+        <dl className="grid gap-x-8 gap-y-4 px-4 py-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-[#6B7280]">Distância no disparo</dt>
+            <dd className="text-sm font-medium text-[#1B2A41]">
               {Math.round(alert.triggerDistanceM)} m
-            </p>
+            </dd>
           </div>
-          <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">Última distância</p>
-            <p className="font-medium">{Math.round(alert.lastDistanceM)} m</p>
+          <div>
+            <dt className="text-xs text-[#6B7280]">Última distância</dt>
+            <dd className="text-sm font-medium text-[#1B2A41]">
+              {Math.round(alert.lastDistanceM)} m
+            </dd>
           </div>
-          <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">Preso</p>
-            <p className="font-mono text-sm">
-              {alert.inmateLatitude.toFixed(6)},{" "}
-              {alert.inmateLongitude.toFixed(6)}
-            </p>
+          <div>
+            <dt className="text-xs text-[#6B7280]">Coordenada do preso</dt>
+            <dd className="font-mono text-sm text-[#1B2A41]">
+              {alert.inmateLatitude.toFixed(6)}, {alert.inmateLongitude.toFixed(6)}
+            </dd>
           </div>
-          <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">Vítima</p>
-            <p className="font-mono text-sm">
-              {alert.victimLatitude.toFixed(6)},{" "}
-              {alert.victimLongitude.toFixed(6)}
-            </p>
+          <div>
+            <dt className="text-xs text-[#6B7280]">Coordenada da vítima</dt>
+            <dd className="font-mono text-sm text-[#1B2A41]">
+              {alert.victimLatitude.toFixed(6)}, {alert.victimLongitude.toFixed(6)}
+            </dd>
           </div>
-          {alert.resolvedAt ? (
-            <div className="rounded-lg border px-3 py-2 sm:col-span-2">
-              <p className="text-xs text-muted-foreground">Resolvido em</p>
-              <p className="font-medium">{formatDate(alert.resolvedAt)}</p>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+        </dl>
+      </section>
 
       {alert.status === "OPEN" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Resolver alerta</CardTitle>
-            <CardDescription>
-              Encerrar manualmente a violação (ação policial).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="reason">Motivo (opcional)</Label>
-              <Input
-                id="reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Ex.: equipe confirmou afastamento"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={acting}
-                onClick={() => void resolve("RESOLVED")}
-              >
-                {acting ? (
-                  <Loader2 className="animate-spin" data-icon="inline-start" />
-                ) : null}
-                Resolver
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={acting}
-                onClick={() => void resolve("FALSE_POSITIVE")}
-              >
-                Marcar falso positivo
-              </Button>
-            </div>
-            {actionError ? (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {actionError}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <section className="border border-[#D8DEE6] px-4 py-4">
+          <h2 className="text-sm font-semibold text-[#1B2A41]">Encerrar</h2>
+          <div className="mt-3 space-y-2">
+            <Label htmlFor="reason">Motivo</Label>
+            <Input
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Opcional"
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              disabled={acting}
+              onClick={() => void resolve("RESOLVED")}
+            >
+              {acting ? (
+                <Loader2 className="animate-spin" data-icon="inline-start" />
+              ) : null}
+              Resolver
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={acting}
+              onClick={() => void resolve("FALSE_POSITIVE")}
+            >
+              Falso positivo
+            </Button>
+          </div>
+          {actionError ? (
+            <p className="mt-3 text-sm text-[#B42318]">{actionError}</p>
+          ) : null}
+        </section>
       ) : null}
     </div>
   );

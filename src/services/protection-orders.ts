@@ -1,4 +1,4 @@
-import { AppError, NotFoundError } from "@/lib/errors";
+import { AppError, ConflictError, NotFoundError } from "@/lib/errors";
 import type {
   ChangeStatusInput,
   CreateProtectionOrderInput,
@@ -21,6 +21,7 @@ import { findVictimById } from "@/repositories/victim.repository";
 import {
   ensureProtectionOrderNotExpired,
   expireDueProtectionOrders,
+  isViolationOpen,
 } from "@/services/protection-order-expiry";
 import { writeAuditLog } from "@/services/write-audit-log";
 import type { ProtectionOrderStatus } from "@/generated/prisma/client";
@@ -112,6 +113,16 @@ function assertStatusTransition(
   );
 }
 
+function assertWatchRadius(radiusMeters: number, watchRadiusMeters: number) {
+  if (watchRadiusMeters <= radiusMeters) {
+    throw new AppError(
+      "WATCH_RADIUS_TOO_SMALL",
+      "O raio de visualização do policial deve ser maior que o raio da vítima",
+      400,
+    );
+  }
+}
+
 export async function createProtectionOrderService(
   input: CreateProtectionOrderInput,
   actorUserId: string,
@@ -120,11 +131,13 @@ export async function createProtectionOrderService(
   await assertVictimAndInmateExist(input.victimId, input.inmateId);
   assertDateRange(input.startsAt, input.endsAt);
   await assertJudicialRefUnique(input.judicialRef);
+  assertWatchRadius(input.radiusMeters, input.watchRadiusMeters);
 
   const order = await createProtectionOrder({
     victimId: input.victimId,
     inmateId: input.inmateId,
     radiusMeters: input.radiusMeters,
+    watchRadiusMeters: input.watchRadiusMeters,
     isSimulation: input.isSimulation,
     judicialRef: input.judicialRef,
     startsAt: input.startsAt,
@@ -145,6 +158,7 @@ export async function createProtectionOrderService(
       victimId: order.victimId,
       inmateId: order.inmateId,
       radiusMeters: order.radiusMeters,
+      watchRadiusMeters: order.watchRadiusMeters,
       isSimulation: order.isSimulation,
       status: order.status,
     },
@@ -166,14 +180,6 @@ export async function updateProtectionOrderService(
 
   const existing = await ensureProtectionOrderNotExpired(existingRaw);
 
-  if (existing.status === "CLOSED") {
-    throw new AppError(
-      "ORDER_CLOSED",
-      "Medida encerrada. Use a reabertura com novo prazo para reativá-la.",
-      400,
-    );
-  }
-
   const nextStartsAt =
     input.startsAt !== undefined ? input.startsAt : existing.startsAt;
   const nextEndsAt =
@@ -184,8 +190,13 @@ export async function updateProtectionOrderService(
     await assertJudicialRefUnique(input.judicialRef, id);
   }
 
+  const nextRadius = input.radiusMeters ?? existing.radiusMeters;
+  const nextWatch = input.watchRadiusMeters ?? existing.watchRadiusMeters;
+  assertWatchRadius(nextRadius, nextWatch);
+
   let order = await updateProtectionOrder(id, {
     radiusMeters: input.radiusMeters,
+    watchRadiusMeters: input.watchRadiusMeters,
     isSimulation: input.isSimulation,
     judicialRef:
       input.judicialRef === undefined ? undefined : (input.judicialRef ?? null),
@@ -226,6 +237,12 @@ export async function changeProtectionOrderStatusService(
   }
 
   const existing = await ensureProtectionOrderNotExpired(existingRaw);
+
+  if (input.status === "CLOSED" && (await isViolationOpen(existing))) {
+    throw new ConflictError(
+      "Não é possível encerrar a medida enquanto a violação estiver em andamento.",
+    );
+  }
 
   assertStatusTransition(existing.status, input.status);
 
@@ -314,7 +331,11 @@ export async function getProtectionOrderService(id: string) {
   if (!order) {
     throw new NotFoundError("Medida protetiva não encontrada");
   }
-  return ensureProtectionOrderNotExpired(order);
+  const current = await ensureProtectionOrderNotExpired(order);
+  return {
+    ...current,
+    violationOpen: await isViolationOpen(current),
+  };
 }
 
 export async function listProtectionOrdersService(

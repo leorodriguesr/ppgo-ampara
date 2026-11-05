@@ -49,6 +49,13 @@ enum GeofenceState {
   PENDING_SAFE
 }
 
+enum LookupStatus {
+  UNKNOWN
+  OK
+  OUT_OF_WINDOW
+  FAILED
+}
+
 enum AuditAction {
   USER_LOGIN
   USER_LOGOUT
@@ -94,6 +101,7 @@ model User {
   createdInmates          Inmate[]          @relation("InmateCreatedBy")
   createdProtectionOrders ProtectionOrder[] @relation("OrderCreatedBy")
   auditLogs               AuditLog[]        @relation("AuditActor")
+  violationReviews        ViolationReview[] @relation("ViolationReviewedBy")
 
   @@map("user")
 }
@@ -156,6 +164,13 @@ model Victim {
   phone       String?
   document    String?
   notes       String?
+  addressZip        String?
+  addressStreet     String?
+  addressNumber     String?
+  addressComplement String?
+  addressDistrict   String?
+  addressCity       String?
+  addressState      String?
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -174,6 +189,13 @@ model Inmate {
   externalInmateId String   @unique
   document         String?
   notes            String?
+  addressZip        String?
+  addressStreet     String?
+  addressNumber     String?
+  addressComplement String?
+  addressDistrict   String?
+  addressCity       String?
+  addressState      String?
   createdById      String
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -191,8 +213,10 @@ model ProtectionOrder {
   publicId      String                @unique @default(cuid())
   victimId      String
   inmateId      String
-  radiusMeters  Int
-  status        ProtectionOrderStatus @default(DRAFT)
+  radiusMeters      Int
+  /// Distância a partir da qual o painel policial passa a ver o agressor.
+  watchRadiusMeters Int                   @default(1000)
+  status            ProtectionOrderStatus @default(DRAFT)
   /// true = mock/simulador; false = posição real no Guardião (pessoa_ident = ID da tornozeleira).
   isSimulation  Boolean               @default(true)
   /// Nº do processo judicial — único quando informado (NULL permitido).
@@ -201,8 +225,16 @@ model ProtectionOrder {
   endsAt        DateTime?
   geofenceState GeofenceState         @default(SAFE)
   pendingCount  Int                   @default(0)
-  lastCheckAt   DateTime?
-  lastDistanceM Float?
+  lastCheckAt         DateTime?
+  lastDistanceM       Float?
+  lastInmateLatitude  Float?
+  lastInmateLongitude Float?
+  lastInmateAt        DateTime?
+  /// Última vez que o aparelho falou com a API, com ou sem GPS.
+  lastContactAt       DateTime?
+  /// Última coordenada considerada aproveitável.
+  lastGpsAt           DateTime?
+  lookupStatus        LookupStatus          @default(UNKNOWN)
   createdById   String
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
@@ -213,7 +245,9 @@ model ProtectionOrder {
   pairingTokens   PairingToken[]
   devices         Device[]
   victimLocations VictimLocation[]
-  alerts          Alert[]
+  alerts           Alert[]
+  trackingPoints   TrackingPoint[]
+  violationReviews ViolationReview[]
 
   @@index([status])
   @@index([victimId])
@@ -251,6 +285,8 @@ model Device {
   deviceTokenHash   String       @unique
   appVersion        String?
   lastSeenAt        DateTime?
+  /// null = o app ainda não informou; false = permissão de segundo plano negada.
+  backgroundEnabled Boolean?
   pairedAt          DateTime     @default(now())
   revokedAt         DateTime?
   createdAt         DateTime     @default(now())
@@ -303,6 +339,62 @@ model Alert {
   @@index([protectionOrderId, status])
   @@index([openedAt])
   @@map("alert")
+}
+
+enum TrackingZone {
+  WATCH
+  VIOLATION
+  OUTSIDE
+}
+
+enum ViolationRuling {
+  COUNTS
+  VICTIM_APPROACH
+  DISMISSED
+}
+
+/// Decisão do policial sobre um episódio de violação. A ausência do registro significa que ainda não foi julgado.
+model ViolationReview {
+  id                String           @id @default(cuid())
+  protectionOrderId String
+  /// Ponto em que a distância entrou no raio da violação. Identifica o episódio.
+  entryPointId      String           @unique
+  ruling            ViolationRuling
+  actions           String?
+  /// Preenchido só quando a ocorrência já terminou e o usuário registrou.
+  finalizedAt       DateTime?
+  reviewedById      String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  protectionOrder ProtectionOrder @relation(fields: [protectionOrderId], references: [id], onDelete: Cascade)
+  reviewedBy      User            @relation("ViolationReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([protectionOrderId])
+  @@map("violation_review")
+}
+
+model TrackingPoint {
+  id                String       @id @default(cuid())
+  protectionOrderId String
+  recordedAt        DateTime
+  zone              TrackingZone
+  distanceMeters    Float
+  victimLatitude    Float
+  victimLongitude   Float
+  inmateLatitude    Float
+  inmateLongitude   Float
+  /// Rua ou bairro do preso no momento do registro. Preenchido depois, sem travar a consulta.
+  inmatePlace       String?
+  victimPlace       String?
+  radiusMeters      Int
+  watchRadiusMeters Int
+
+  protectionOrder ProtectionOrder @relation(fields: [protectionOrderId], references: [id])
+
+  @@index([protectionOrderId, recordedAt])
+  @@index([recordedAt])
+  @@map("tracking_point")
 }
 
 model AuditLog {

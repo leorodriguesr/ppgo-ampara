@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  snapVigenciaEnd,
+  snapVigenciaStart,
+  toDateInputValue,
+} from "@/lib/vigencia-day";
+
 function emptyToUndefined(value: unknown) {
   if (value === "" || value === null || value === undefined) {
     return undefined;
@@ -20,13 +26,21 @@ const requiredJudicialRef = z.preprocess(
     .max(200),
 );
 
-const optionalDate = z.preprocess(emptyToUndefined, z.coerce.date().optional());
+const optionalDate = z.preprocess(
+  snapVigenciaStart,
+  z.coerce.date().optional(),
+);
 
 const requiredEndsAt = z.preprocess(
-  emptyToUndefined,
+  snapVigenciaEnd,
   z.coerce.date({
     error: "Informe o prazo de término da medida",
   }),
+);
+
+const optionalEndsAt = z.preprocess(
+  snapVigenciaEnd,
+  z.coerce.date().optional(),
 );
 
 const protectionOrderStatusFilter = z.enum([
@@ -47,6 +61,12 @@ export const createProtectionOrderSchema = z
       .min(50, "Raio mínimo: 50 m")
       .max(50000, "Raio máximo: 50.000 m")
       .default(300),
+    watchRadiusMeters: z.coerce
+      .number()
+      .int("O raio de visualização deve ser um número inteiro")
+      .min(50, "Raio de visualização mínimo: 50 m")
+      .max(50000, "Raio de visualização máximo: 50.000 m")
+      .default(1000),
     isSimulation: z.boolean().default(true),
     judicialRef: requiredJudicialRef,
     startsAt: optionalDate,
@@ -67,6 +87,11 @@ export const createProtectionOrderSchema = z
   .refine((data) => data.endsAt.getTime() > Date.now(), {
     message: "O prazo de término deve ser uma data futura",
     path: ["endsAt"],
+  })
+  .refine((data) => data.watchRadiusMeters > data.radiusMeters, {
+    message:
+      "O raio de visualização do policial deve ser maior que o raio da vítima",
+    path: ["watchRadiusMeters"],
   });
 
 export const updateProtectionOrderSchema = z
@@ -77,10 +102,16 @@ export const updateProtectionOrderSchema = z
       .min(50, "Raio mínimo: 50 m")
       .max(50000, "Raio máximo: 50.000 m")
       .optional(),
+    watchRadiusMeters: z.coerce
+      .number()
+      .int("O raio de visualização deve ser um número inteiro")
+      .min(50, "Raio de visualização mínimo: 50 m")
+      .max(50000, "Raio de visualização máximo: 50.000 m")
+      .optional(),
     isSimulation: z.boolean().optional(),
     judicialRef: optionalText,
     startsAt: optionalDate,
-    endsAt: optionalDate,
+    endsAt: optionalEndsAt,
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "Informe ao menos um campo para atualizar",
@@ -103,11 +134,19 @@ export const changeStatusSchema = z.object({
 });
 
 export const reopenProtectionOrderSchema = z.object({
-  endsAt: z.coerce.date({
-    error: "Informe o novo prazo de término",
-  }),
-}).refine((data) => data.endsAt.getTime() > Date.now(), {
-  message: "O novo prazo deve ser uma data futura",
+  endsAt: z.preprocess(
+    snapVigenciaEnd,
+    z.coerce.date({
+      error: "Informe o novo prazo de término",
+    }),
+  ),
+}).refine((data) => {
+  const selected = toDateInputValue(data.endsAt);
+  const today = toDateInputValue(new Date());
+  return selected >= today;
+}, {
+  message:
+    "O novo término não pode ser anterior a hoje.",
   path: ["endsAt"],
 });
 

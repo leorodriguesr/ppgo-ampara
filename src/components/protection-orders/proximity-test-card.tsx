@@ -102,14 +102,10 @@ export function ProximityTestCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Radar className="size-4" />
-          Teste de proximidade
-        </CardTitle>
+        <CardTitle className="text-base">Teste de proximidade</CardTitle>
         <CardDescription>
-          Executa o motor de geofence com as coordenadas da vítima (pode abrir
-          ou resolver alertas). Use o simulador para posicionar o preso perto ou
-          longe antes.
+          Roda a verificação com a posição da vítima. Pode abrir ou encerrar um
+          alerta.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

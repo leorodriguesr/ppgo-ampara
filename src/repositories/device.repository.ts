@@ -111,7 +111,11 @@ export async function findActiveDeviceByTokenHash(deviceTokenHash: string) {
 
 export async function touchDeviceLastSeen(
   id: string,
-  profile?: { deviceBrand?: string | null; deviceModel?: string | null },
+  profile?: {
+    deviceBrand?: string | null;
+    deviceModel?: string | null;
+    backgroundEnabled?: boolean | null;
+  },
 ) {
   return prisma.device.update({
     where: { id },
@@ -119,6 +123,9 @@ export async function touchDeviceLastSeen(
       lastSeenAt: new Date(),
       ...(profile?.deviceBrand ? { deviceBrand: profile.deviceBrand } : {}),
       ...(profile?.deviceModel ? { deviceModel: profile.deviceModel } : {}),
+      ...(profile?.backgroundEnabled !== undefined
+        ? { backgroundEnabled: profile.backgroundEnabled }
+        : {}),
     },
     select: { id: true, lastSeenAt: true },
   });

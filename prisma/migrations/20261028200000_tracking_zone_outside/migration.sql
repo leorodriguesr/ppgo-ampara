@@ -1,0 +1,1 @@
+ALTER TYPE "TrackingZone" ADD VALUE 'OUTSIDE';

@@ -37,3 +37,10 @@ export class NotFoundError extends AppError {
     this.name = "NotFoundError";
   }
 }
+
+export class ConflictError extends AppError {
+  constructor(message = "Operação não permitida") {
+    super("CONFLICT", message, 409);
+    this.name = "ConflictError";
+  }
+}

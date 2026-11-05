@@ -3,6 +3,7 @@ import type { GeofenceState } from "@/generated/prisma/client";
 import {
   AnkleMonitorApiError,
   AnkleMonitorTimeoutError,
+  InmateOutOfWindowError,
   localizarDetento,
 } from "@/integrations/ankle-monitor";
 import { AppError, NotFoundError } from "@/lib/errors";
@@ -18,8 +19,16 @@ import {
   updateProtectionOrderGeofence,
 } from "@/repositories/protection-order.repository";
 import { createVictimLocation } from "@/repositories/victim-location.repository";
-import { evaluateGeofence } from "@/services/evaluate-geofence";
 import { notifyVictimOfViolation } from "@/services/notify-victim";
+import { ensureProtectionOrderNotExpired } from "@/services/protection-order-expiry";
+import {
+  decideFoundGeofence,
+  intervalAfterAbsence,
+  intervalAfterFailure,
+  isVictimFixStale,
+  stateAfterAbsence,
+} from "@/services/proximity-policy";
+import { recordTrackingPoint } from "@/services/tracking";
 import { writeAuditLog } from "@/services/write-audit-log";
 
 type AuditMeta = {
@@ -60,42 +69,14 @@ export type ProximityCheckResponse = {
   inmateName: string | null;
   /** Por que o check ficou degradado; ausente quando degradado=false. */
   degradedReason?: string;
+  lookupStatus: "UNKNOWN" | "OK" | "OUT_OF_WINDOW" | "FAILED";
 };
 
-const MAX_RECORDED_AT_SKEW_MS = 10 * 60 * 1000;
 const ALERT_REFRESH_AUDIT_THROTTLE_MS = 60_000;
 
 type OrderForProximity = NonNullable<
   Awaited<ReturnType<typeof findProtectionOrderById>>
 >;
-
-function nextCheckSuggestedSeconds(
-  state: GeofenceState,
-  appState?: "foreground" | "background",
-  isSimulation?: boolean,
-) {
-  if (isSimulation === false) {
-    if (
-      state === "VIOLATING" ||
-      state === "PENDING_VIOLATION" ||
-      state === "PENDING_SAFE"
-    ) {
-      return geofenceConfig.intervals.liveViolatingSeconds;
-    }
-    return geofenceConfig.intervals.liveSeconds;
-  }
-  if (state === "VIOLATING") {
-    return geofenceConfig.intervals.violatingMinSeconds;
-  }
-  // Confirma a 2ª leitura depressa (evita ~30s+30s só para abrir alerta).
-  if (state === "PENDING_VIOLATION" || state === "PENDING_SAFE") {
-    return geofenceConfig.intervals.violatingMinSeconds;
-  }
-  if (appState === "background") {
-    return geofenceConfig.intervals.backgroundMinSeconds;
-  }
-  return geofenceConfig.intervals.foregroundSeconds;
-}
 
 function toAlertSummary(
   alert: {
@@ -146,11 +127,11 @@ function buildResponse(params: {
   judicialRef: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
-  appState?: "foreground" | "background";
-  isSimulation?: boolean;
   inmateName: string | null;
   degraded: boolean;
   degradedReason?: string;
+  nextCheckSuggestedSeconds: number;
+  lookupStatus: ProximityCheckResponse["lookupStatus"];
 }): ProximityCheckResponse {
   const insideRadius =
     params.distanceMeters != null &&
@@ -165,14 +146,11 @@ function buildResponse(params: {
     judicialRef: params.judicialRef,
     startsAt: params.startsAt?.toISOString() ?? null,
     endsAt: params.endsAt?.toISOString() ?? null,
-    nextCheckSuggestedSeconds: nextCheckSuggestedSeconds(
-      params.geofenceState,
-      params.appState,
-      params.isSimulation,
-    ),
+    nextCheckSuggestedSeconds: params.nextCheckSuggestedSeconds,
     serverTime: new Date().toISOString(),
     degraded: params.degraded,
     inmateName: params.inmateName,
+    lookupStatus: params.lookupStatus,
   };
 
   if (params.degraded && params.degradedReason) {
@@ -210,25 +188,39 @@ async function runProximityEngine(params: {
 
   const recordedAt = coords.recordedAt ?? new Date();
   const now = Date.now();
-  const recordedAtSkewed =
-    Math.abs(recordedAt.getTime() - now) > MAX_RECORDED_AT_SKEW_MS;
-
-  console.log("[proximity/check]", {
-    orderId: order.id,
-    isSimulation: order.isSimulation,
-    externalInmateId: order.inmate?.externalInmateId ?? null,
-    accuracyMeters: coords.accuracyMeters ?? null,
-    recordedAtSkewed,
-  });
-
-  await createVictimLocation({
-    protectionOrderId: order.id,
-    latitude: coords.latitude,
-    longitude: coords.longitude,
+  const checkedAt = new Date();
+  const fixIsStale = isVictimFixStale({
     accuracyMeters: coords.accuracyMeters,
-    recordedAt: recordedAtSkewed ? new Date() : recordedAt,
-    source: params.source ?? (actor.type === "DEVICE" ? "APP" : "POLICE_TEST"),
+    recordedAt: coords.recordedAt,
+    now: checkedAt,
   });
+
+  if (fixIsStale) {
+    await updateProtectionOrderGeofence(order.id, {
+      geofenceState: order.geofenceState,
+      pendingCount: order.pendingCount,
+      lastCheckAt: checkedAt,
+      lastDistanceM: order.lastDistanceM,
+      lookupStatus: "FAILED",
+      lastContactAt: checkedAt,
+    });
+    const openAlert = await findOpenAlertByOrderId(order.id);
+    return buildResponse({
+      geofenceState: order.geofenceState,
+      alert: openAlert,
+      inmateLocation: inmateFromAlert(openAlert),
+      distanceMeters: null,
+      radiusMeters: order.radiusMeters,
+      judicialRef: order.judicialRef ?? null,
+      startsAt: order.startsAt ?? null,
+      endsAt: order.endsAt ?? null,
+      inmateName: order.inmate?.fullName?.trim() || null,
+      degraded: true,
+      degradedReason: "stale_victim_fix",
+      nextCheckSuggestedSeconds: intervalAfterFailure(),
+      lookupStatus: "FAILED",
+    });
+  }
 
   if (!order.inmate?.externalInmateId) {
     console.log("[proximity/check] degradado: preso sem ID de tornozeleira");
@@ -242,11 +234,11 @@ async function runProximityEngine(params: {
       judicialRef: order.judicialRef ?? null,
       startsAt: order.startsAt ?? null,
       endsAt: order.endsAt ?? null,
-      appState: coords.appState,
-      isSimulation: order.isSimulation,
       inmateName: order.inmate?.fullName?.trim() || null,
       degraded: true,
       degradedReason: "missing_external_inmate_id",
+      nextCheckSuggestedSeconds: intervalAfterFailure(),
+      lookupStatus: "FAILED",
     });
   }
 
@@ -259,6 +251,36 @@ async function runProximityEngine(params: {
       isSimulation: order.isSimulation,
     });
   } catch (error) {
+    if (error instanceof InmateOutOfWindowError) {
+      const nextState = stateAfterAbsence(order.geofenceState);
+      const keepViolation =
+        nextState === "VIOLATING" || nextState === "PENDING_SAFE";
+      await updateProtectionOrderGeofence(order.id, {
+        geofenceState: nextState,
+        pendingCount: keepViolation ? order.pendingCount : 0,
+        lastCheckAt: checkedAt,
+        lastDistanceM: keepViolation ? order.lastDistanceM : null,
+        lookupStatus: "OUT_OF_WINDOW",
+        lastContactAt: checkedAt,
+        lastGpsAt: recordedAt,
+      });
+      const openAlert = await findOpenAlertByOrderId(order.id);
+      return buildResponse({
+        geofenceState: nextState,
+        alert: keepViolation && openAlert?.status === "OPEN" ? openAlert : null,
+        inmateLocation: keepViolation ? inmateFromAlert(openAlert) : null,
+        distanceMeters: null,
+        radiusMeters: order.radiusMeters,
+        judicialRef: order.judicialRef ?? null,
+        startsAt: order.startsAt ?? null,
+        endsAt: order.endsAt ?? null,
+        inmateName: order.inmate?.fullName?.trim() || null,
+        degraded: false,
+        nextCheckSuggestedSeconds: intervalAfterAbsence(order.geofenceState),
+        lookupStatus: "OUT_OF_WINDOW",
+      });
+    }
+
     if (isExternalApiError(error)) {
       await writeAuditLog({
         actorUserId: actor.type === "USER" ? actor.userId : null,
@@ -275,9 +297,14 @@ async function runProximityEngine(params: {
         },
       });
 
-      console.log("[proximity/check] degradado: falha ao localizar preso", {
-        message: error instanceof Error ? error.message : String(error),
-        isSimulation: order.isSimulation,
+      await updateProtectionOrderGeofence(order.id, {
+        geofenceState: order.geofenceState,
+        pendingCount: order.pendingCount,
+        lastCheckAt: checkedAt,
+        lastDistanceM: order.lastDistanceM,
+        lookupStatus: "FAILED",
+        lastContactAt: checkedAt,
+        lastGpsAt: recordedAt,
       });
 
       const openAlert = await findOpenAlertByOrderId(order.id);
@@ -290,38 +317,66 @@ async function runProximityEngine(params: {
         judicialRef: order.judicialRef ?? null,
         startsAt: order.startsAt ?? null,
         endsAt: order.endsAt ?? null,
-        appState: coords.appState,
-        isSimulation: order.isSimulation,
         inmateName: order.inmate?.fullName?.trim() || null,
         degraded: true,
         degradedReason: "external_location_unavailable",
+        nextCheckSuggestedSeconds: intervalAfterFailure(),
+        lookupStatus: "FAILED",
       });
     }
     throw error;
   }
 
   const distanceMeters = localizar.distanciaMetros;
-  console.log("[proximity/check] localizar ok", {
-    isSimulation: order.isSimulation,
-    distanceMeters,
-    latitudePreso: localizar.latitudePreso,
-    longitudePreso: localizar.longitudePreso,
-  });
-  const evaluation = evaluateGeofence({
+  const evaluation = decideFoundGeofence({
     radiusMeters: order.radiusMeters,
+    watchRadiusMeters: order.watchRadiusMeters,
     distanceMeters,
-    hysteresisMeters: geofenceConfig.hysteresisMeters,
     currentState: order.geofenceState,
     pendingCount: order.pendingCount,
-    requiredConsecutiveHits: geofenceConfig.requiredConsecutiveHits,
   });
 
   await updateProtectionOrderGeofence(order.id, {
     geofenceState: evaluation.nextState,
     pendingCount: evaluation.pendingCount,
-    lastCheckAt: new Date(),
+    lastCheckAt: checkedAt,
     lastDistanceM: distanceMeters,
+    lastInmateLatitude: localizar.latitudePreso,
+    lastInmateLongitude: localizar.longitudePreso,
+    lastInmateAt: checkedAt,
+    lookupStatus: "OK",
+    lastContactAt: checkedAt,
+    lastGpsAt: recordedAt,
   });
+
+  if (evaluation.persistFix) {
+    await createVictimLocation({
+      protectionOrderId: order.id,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      accuracyMeters: coords.accuracyMeters,
+      recordedAt,
+      source: params.source ?? (actor.type === "DEVICE" ? "APP" : "POLICE_TEST"),
+    });
+  }
+
+  try {
+    await recordTrackingPoint({
+      protectionOrderId: order.id,
+      recordedAt: checkedAt,
+      distanceMeters,
+      radiusMeters: order.radiusMeters,
+      watchRadiusMeters: order.watchRadiusMeters,
+      geofenceViolating: evaluation.nextState === "VIOLATING",
+      previousDistanceMeters: order.lastDistanceM,
+      victimLatitude: coords.latitude,
+      victimLongitude: coords.longitude,
+      inmateLatitude: localizar.latitudePreso,
+      inmateLongitude: localizar.longitudePreso,
+    });
+  } catch (error) {
+    console.error("[tracking] falha ao gravar percurso", error);
+  }
 
   const inmateLocation = {
     latitude: localizar.latitudePreso,
@@ -439,22 +494,32 @@ async function runProximityEngine(params: {
     }
   }
 
-  await writeAuditLog({
-    actorUserId: actor.type === "USER" ? actor.userId : null,
-    actorType: actor.type === "DEVICE" ? "DEVICE" : "USER",
-    action: "PROXIMITY_CHECKED",
-    entityType: "ProtectionOrder",
-    entityId: order.id,
-    ip: meta?.ip,
-    userAgent: meta?.userAgent,
-    metadata: {
-      distanceMeters,
-      geofenceState: evaluation.nextState,
-      previousState: order.geofenceState,
-      pendingCount: evaluation.pendingCount,
-      deviceId: actor.type === "DEVICE" ? actor.deviceId : undefined,
-    },
+  await ensureProtectionOrderNotExpired({
+    id: order.id,
+    publicId: order.publicId,
+    status: order.status,
+    endsAt: order.endsAt,
+    geofenceState: evaluation.nextState,
   });
+
+  if (evaluation.auditProximity) {
+    await writeAuditLog({
+      actorUserId: actor.type === "USER" ? actor.userId : null,
+      actorType: actor.type === "DEVICE" ? "DEVICE" : "USER",
+      action: "PROXIMITY_CHECKED",
+      entityType: "ProtectionOrder",
+      entityId: order.id,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+      metadata: {
+        distanceMeters,
+        geofenceState: evaluation.nextState,
+        previousState: order.geofenceState,
+        pendingCount: evaluation.pendingCount,
+        deviceId: actor.type === "DEVICE" ? actor.deviceId : undefined,
+      },
+    });
+  }
 
   return buildResponse({
     geofenceState: evaluation.nextState,
@@ -465,10 +530,10 @@ async function runProximityEngine(params: {
     judicialRef: order.judicialRef ?? null,
     startsAt: order.startsAt ?? null,
     endsAt: order.endsAt ?? null,
-    appState: coords.appState,
-    isSimulation: order.isSimulation,
     inmateName: order.inmate?.fullName?.trim() || null,
     degraded: false,
+    nextCheckSuggestedSeconds: evaluation.nextCheckSeconds,
+    lookupStatus: "OK",
   });
 }
 

@@ -27,7 +27,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-[2px]",
+        "fixed inset-0 z-[2100] bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-[2px]",
         className,
       )}
       {...props}
@@ -35,19 +35,26 @@ function DialogOverlay({
   );
 }
 
+type DialogTone = "rose" | "indigo" | "gold" | "teal" | "violet";
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  tone,
   ...props
-}: DialogPrimitive.Popup.Props & { showCloseButton?: boolean }) {
+}: DialogPrimitive.Popup.Props & {
+  showCloseButton?: boolean;
+  tone?: DialogTone;
+}) {
   return (
     <DialogPrimitive.Portal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        data-tone={tone}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-0 text-sm text-foreground shadow-lg ring-1 ring-black/8 outline-none data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0",
+          "fixed top-1/2 left-1/2 z-[2101] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-0 text-sm text-foreground shadow-lg ring-1 ring-black/8 outline-none data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0",
           className,
         )}
         {...props}
@@ -60,7 +67,7 @@ function DialogContent({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="absolute top-3 right-3"
+                className="absolute top-3 right-3 cursor-pointer"
               />
             }
           >
@@ -96,11 +103,20 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
+function DialogTitle({
+  className,
+  tone,
+  ...props
+}: DialogPrimitive.Title.Props & { tone?: DialogTone }) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-base font-semibold text-[#1B2A41]", className)}
+      data-tone={tone}
+      className={cn(
+        "text-base font-semibold text-[#1B2A41]",
+        tone && "ampara-title",
+        className,
+      )}
       {...props}
     />
   );

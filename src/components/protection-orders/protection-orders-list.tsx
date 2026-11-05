@@ -1,15 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Pencil, Plug2, Plus } from "lucide-react";
 
 import { RowDeleteButton } from "@/components/layout/row-delete-button";
-import { ProtectionOrderForm } from "@/components/protection-orders/protection-order-form";
+import { PageLoading } from "@/components/layout/page-loading";
 import {
-  ProtectionOrderSourceBadge,
-  ProtectionOrderStatusBadge,
-} from "@/components/protection-orders/status-badge";
+  ListSearch,
+  ListSearchField,
+  ListSearchSubmit,
+} from "@/components/layout/list-search";
+import { OrderConnectDialog } from "@/components/protection-orders/order-connect-dialog";
+import { ProtectionOrderForm } from "@/components/protection-orders/protection-order-form";
+import { ProtectionOrderStatusBadge } from "@/components/protection-orders/status-badge";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
@@ -19,14 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { formatDateTime } from "@/lib/format";
+import { formatDay, formatPersonName } from "@/lib/format";
 
 type OrderRow = {
   id: string;
   publicId: string;
   status: string;
   radiusMeters: number;
+  watchRadiusMeters?: number;
   judicialRef: string | null;
   isSimulation: boolean;
   startsAt: string | null;
@@ -34,6 +37,23 @@ type OrderRow = {
   createdAt: string;
   victim?: { fullName: string } | null;
   inmate?: { fullName: string } | null;
+};
+
+type OrderDetail = OrderRow & {
+  victimId: string;
+  inmateId: string;
+  victim?: {
+    id: string;
+    publicId: string;
+    fullName: string;
+    phone: string | null;
+  } | null;
+  inmate?: {
+    id: string;
+    publicId: string;
+    fullName: string;
+    externalInmateId: string;
+  } | null;
 };
 
 type ListResponse = {
@@ -54,7 +74,6 @@ const STATUS_FILTERS = [
 ] as const;
 
 export function ProtectionOrdersList() {
-  const router = useRouter();
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -64,6 +83,10 @@ export function ProtectionOrdersList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [editing, setEditing] = useState<OrderDetail | null>(null);
+  const [editBusyId, setEditBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,6 +135,30 @@ export function ProtectionOrdersList() {
     setStatusFilter(status);
   }
 
+  async function openEdit(id: string) {
+    setEditBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/protection-orders/${id}`, {
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.message === "string"
+            ? data.message
+            : "Não foi possível carregar a medida",
+        );
+        return;
+      }
+      setEditing(data as OrderDetail);
+    } catch {
+      setError("Falha de comunicação com o servidor");
+    } finally {
+      setEditBusyId(null);
+    }
+  }
+
   async function deleteOrder(id: string) {
     const res = await fetch(`/api/v1/protection-orders/${id}`, {
       method: "DELETE",
@@ -129,11 +176,13 @@ export function ProtectionOrdersList() {
     await load();
   }
 
+  if (loading && !result) return <PageLoading />;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-[#1B2A41]">
+          <h1 data-tone="violet" className="ampara-title text-lg font-semibold text-[#1B2A41]">
             Medidas protetivas
           </h1>
           <p className="text-sm text-[#6B7280]">
@@ -145,31 +194,25 @@ export function ProtectionOrdersList() {
         <Button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="bg-[#1B2A41] text-white hover:bg-[#24364f]"
+          className="ampara-create cursor-pointer"
         >
           <Plus data-icon="inline-start" />
           Nova medida
         </Button>
       </div>
 
-      <form
-        onSubmit={handleSearch}
-        className="flex max-w-3xl flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2.5"
-      >
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-[#9CA3AF]" />
-          <Input
-            id="order-search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por processo, vítima ou preso"
-            className="h-9 bg-white pl-8"
-          />
-        </div>
+      <ListSearch onSubmit={handleSearch}>
+        <ListSearchField
+          id="order-search"
+          value={q}
+          onChange={setQ}
+          placeholder="Processo, vítima ou preso"
+          label="Processo, vítima ou preso"
+        />
         <NativeSelect
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="min-w-[220px]"
+          className="h-10 w-40 cursor-pointer rounded-none border-0 border-l border-border bg-transparent px-3 text-sm text-foreground shadow-none focus-visible:ring-0 dark:bg-transparent dark:text-foreground"
           aria-label="Filtrar por status"
         >
           {STATUS_FILTERS.map((option) => (
@@ -178,10 +221,8 @@ export function ProtectionOrdersList() {
             </option>
           ))}
         </NativeSelect>
-        <Button type="submit" variant="outline" size="sm">
-          Buscar
-        </Button>
-      </form>
+        <ListSearchSubmit />
+      </ListSearch>
 
       <div>
         {error ? (
@@ -199,65 +240,87 @@ export function ProtectionOrdersList() {
         ) : null}
 
         {!loading && result && result.data.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-[#E8EAED] text-[12px] font-medium text-[#4B5563]">
-                <tr className="border-b border-[#E5E7EB]">
-                  <th className="py-2 pr-4 pl-3 font-medium">Processo</th>
-                  <th className="py-2 pr-4 font-medium">Vítima</th>
-                  <th className="py-2 pr-4 font-medium">Preso</th>
-                  <th className="py-2 pr-4 font-medium">Raio</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 pr-4 font-medium">Fonte</th>
-                  <th className="py-2 pr-3 font-medium">Vigência</th>
-                  <th className="w-9 py-2 pr-2 pl-1 font-medium" />
+          <div className="overflow-x-auto rounded-xl">
+            <table className="w-full min-w-[860px] text-left text-sm whitespace-nowrap">
+              <thead className="ampara-thead text-sm font-semibold">
+                <tr>
+                  <th className="py-2.5 pr-4 pl-3 font-semibold">Processo</th>
+                  <th className="py-2.5 pr-4 font-semibold">Vítima</th>
+                  <th className="py-2.5 pr-4 font-semibold">Preso</th>
+                  <th className="py-2.5 pr-4 font-semibold">Raio de Proteção</th>
+                  <th className="py-2.5 pr-4 font-semibold">Status</th>
+                  <th className="py-2.5 pr-3 font-semibold">Vigência</th>
+                  <th className="w-28 py-2.5 pr-2 pl-1 font-semibold" />
                 </tr>
               </thead>
               <tbody>
                 {result.data.map((order) => (
                   <tr
                     key={order.id}
-                    tabIndex={0}
-                    className="cursor-pointer border-b border-[#E5E7EB] last:border-b-0 hover:bg-[#EEF0F3] focus-visible:bg-[#EEF0F3] focus-visible:outline-none"
-                    onClick={() => router.push(`/protection-orders/${order.id}`)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        router.push(`/protection-orders/${order.id}`);
-                      }
-                    }}
+                    className="ampara-row border-b border-[#F0F2F5] transition-colors"
                   >
-                    <td className="py-3 pr-4 pl-3 font-medium text-[#1B2A41]">
+                    <td className="py-3 pr-4 pl-3 font-normal text-[#1B2A41]">
                       {order.judicialRef || order.publicId}
                     </td>
-                    <td className="py-3 pr-4 text-[#4B5563]">
-                      {order.victim?.fullName || "—"}
+                    <td className="py-3 pr-4 font-normal text-[#1B2A41]">
+                      {order.victim?.fullName
+                        ? formatPersonName(order.victim.fullName)
+                        : "—"}
                     </td>
-                    <td className="py-3 pr-4 text-[#4B5563]">
-                      {order.inmate?.fullName || "—"}
+                    <td className="py-3 pr-4 font-normal text-[#1B2A41]">
+                      {order.inmate?.fullName
+                        ? formatPersonName(order.inmate.fullName)
+                        : "—"}
                     </td>
-                    <td className="py-3 pr-4 text-[#4B5563]">
+                    <td className="py-3 pr-4 font-normal text-[#1B2A41]">
                       {order.radiusMeters} m
                     </td>
                     <td className="py-3 pr-4">
-                      <ProtectionOrderStatusBadge status={order.status} />
+                      <ProtectionOrderStatusBadge status={order.status} plain />
                     </td>
-                    <td className="py-3 pr-4">
-                      <ProtectionOrderSourceBadge
-                        isSimulation={order.isSimulation !== false}
-                      />
-                    </td>
-                    <td className="py-3 whitespace-nowrap text-[#6B7280]">
+                    <td className="py-3 pr-3 font-normal text-[#1B2A41]">
                       {order.startsAt || order.endsAt
-                        ? `${order.startsAt ? formatDateTime(order.startsAt) : "—"} → ${order.endsAt ? formatDateTime(order.endsAt) : "—"}`
+                        ? `${order.startsAt ? formatDay(order.startsAt) : "—"} - ${order.endsAt ? formatDay(order.endsAt) : "—"}`
                         : "—"}
                     </td>
-                    <td className="w-9 py-3 pr-2 pl-1">
-                      <RowDeleteButton
-                        label="Excluir medida"
-                        confirmMessage={`Excluir a medida ${order.judicialRef || order.publicId}? Pareamentos e alertas ligados a ela também serão removidos.`}
-                        onDelete={() => deleteOrder(order.id)}
-                      />
+                    <td className="w-28 py-3 pr-2 pl-1">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Pareamento da medida"
+                          title="Pareamento"
+                          className="cursor-pointer text-[#0F766E] hover:bg-transparent hover:text-[#0C5C56] dark:text-[#7DCDC4] dark:hover:text-white"
+                          onClick={() => setConnectingId(order.id)}
+                        >
+                          {connectLoading && connectingId === order.id ? (
+                            <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+                          ) : (
+                            <Plug2 className="size-3.5" strokeWidth={1.75} />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Editar medida"
+                          title="Editar medida"
+                          className="cursor-pointer text-[#8A6A08] hover:bg-transparent hover:text-[#6E5406] dark:text-[#F0D36A] dark:hover:text-white"
+                          onClick={() => void openEdit(order.id)}
+                        >
+                          {editBusyId === order.id ? (
+                            <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+                          ) : (
+                            <Pencil className="size-3.5" strokeWidth={1.75} />
+                          )}
+                        </Button>
+                        <RowDeleteButton
+                          label="Excluir medida"
+                          confirmMessage={`Excluir a medida ${order.judicialRef || order.publicId}? Pareamentos e alertas ligados a ela também serão removidos.`}
+                          onDelete={() => deleteOrder(order.id)}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -297,17 +360,76 @@ export function ProtectionOrdersList() {
         ) : null}
       </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl overflow-hidden">
+      <OrderConnectDialog
+        orderId={connectingId}
+        onOpenChange={(open) => {
+          if (!open) setConnectingId(null);
+        }}
+        onChanged={() => void load()}
+        onLoadingChange={setConnectLoading}
+      />
+
+      <Dialog
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      >
+        <DialogContent tone="violet" className="flex h-[min(720px,calc(100svh-2rem))] max-w-2xl flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Nova medida protetiva</DialogTitle>
+            <DialogTitle tone="violet">Editar medida protetiva</DialogTitle>
+            <DialogDescription>
+              {editing?.judicialRef ? `Processo ${editing.judicialRef}` : "Cadastro da medida"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {editing?.status === "CLOSED" ? (
+              <p className="mx-5 mt-4 shrink-0 rounded-lg border border-[#E5E7EB] bg-[#F8F9FB] px-3 py-2 text-sm leading-6 text-[#4B5563]">
+                Esta medida está encerrada. O cadastro pode ser alterado. O
+                pareamento só volta depois da reabertura.
+              </p>
+            ) : null}
+            {editing && editing.victimId ? (
+              <ProtectionOrderForm
+                key={editing.id}
+                pinnedFooter
+                mode="edit"
+                orderId={editing.id}
+                initialValues={{
+                  victimId: editing.victimId,
+                  inmateId: editing.inmateId,
+                  radiusMeters: editing.radiusMeters,
+                  watchRadiusMeters: editing.watchRadiusMeters,
+                  isSimulation: editing.isSimulation !== false,
+                  judicialRef: editing.judicialRef,
+                  startsAt: editing.startsAt,
+                  endsAt: editing.endsAt,
+                  victim: editing.victim,
+                  inmate: editing.inmate,
+                }}
+                onCancel={() => setEditing(null)}
+                onSuccess={() => {
+                  setEditing(null);
+                  void load();
+                }}
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent tone="violet" className="flex h-[min(720px,calc(100svh-2rem))] max-w-2xl flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle tone="violet">Nova medida protetiva</DialogTitle>
             <DialogDescription>
               Vincule vítima e preso e defina o raio e a vigência.
             </DialogDescription>
           </DialogHeader>
-          <div className="px-5 pt-4">
+          <div className="flex min-h-0 flex-1 flex-col">
             <ProtectionOrderForm
               key={createOpen ? "open" : "closed"}
+              pinnedFooter
               mode="create"
               onCancel={() => setCreateOpen(false)}
               onSuccess={() => {

@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { AppError, NotFoundError } from "@/lib/errors";
+import { addressColumns } from "@/modules/address";
 import type {
   CreateInmateInput,
   UpdateInmateInput,
@@ -53,8 +54,8 @@ export async function createInmateService(
       fullName: input.fullName,
       externalInmateId: input.externalInmateId,
       document: input.document,
-      notes: input.notes,
       createdById: actorUserId,
+      ...addressColumns(input),
     });
 
     await writeAuditLog({
@@ -106,7 +107,7 @@ export async function updateInmateService(
       externalInmateId: input.externalInmateId,
       document:
         input.document === undefined ? undefined : (input.document ?? null),
-      notes: input.notes === undefined ? undefined : (input.notes ?? null),
+      ...addressColumns(input),
     });
 
     await writeAuditLog({

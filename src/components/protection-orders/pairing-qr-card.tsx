@@ -29,6 +29,7 @@ type DeviceRow = {
 type PairingQrCardProps = {
   orderId: string;
   status: string;
+  disconnectBlocked?: boolean;
   onOrderActivated?: () => void;
 };
 
@@ -91,6 +92,7 @@ function useCountdown(expiresAt: string | null) {
 export function PairingQrCard({
   orderId,
   status,
+  disconnectBlocked = false,
   onOrderActivated,
 }: PairingQrCardProps) {
   const [generated, setGenerated] = useState<PairingGenerateResponse | null>(
@@ -174,17 +176,14 @@ export function PairingQrCard({
     const lastDevice = linkedDevice ?? previousDevices[0] ?? null;
 
     return (
-      <div className="overflow-hidden rounded-2xl bg-white">
-        <div className="flex min-h-[220px] flex-col items-center justify-center px-6 py-12 text-center">
-          <div className="mb-5 flex size-16 items-center justify-center rounded-2xl bg-[#F3F4F6] text-[#1B2A41]">
-            <Smartphone className="size-8" />
-          </div>
-          <h2 className="text-lg font-semibold tracking-tight text-[#1B2A41]">
+      <div className="border border-[#D8DEE6] bg-white px-5 py-5">
+        <div>
+          <h2 className="text-base font-semibold text-[#1B2A41]">
             Pareamento pausado
           </h2>
-          <p className="mt-2 max-w-md text-sm leading-6 text-[#6B7280]">
+          <p className="mt-1 max-w-lg text-sm leading-6 text-[#4B5563]">
             A medida está encerrada. O app não gera QR nem recebe localização
-            até a reabertura. Use o prazo acima para reativar.
+            até a reabertura.
           </p>
           {lastDevice ? (
             <p className="mt-4 text-sm text-[#4B5563]">
@@ -320,24 +319,24 @@ export function PairingQrCard({
   return (
     <div className="w-full space-y-4">
       {error ? (
-        <p className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm text-[#B42318]">
+        <p className="border border-[#F3C7C7] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B42318]">
           {error}
         </p>
       ) : null}
 
       {pairedNotice && !generated ? (
-        <p className="rounded-xl bg-[#ECFDF3] px-4 py-3 text-sm text-[#166534]">
+        <p className="border border-[#BBF7D0] bg-[#ECFDF3] px-4 py-3 text-sm text-[#166534]">
           Celular vinculado. A vítima já pode usar o mapa.
         </p>
       ) : null}
 
       {loadingDevices ? (
-        <div className="flex h-72 items-center justify-center rounded-2xl bg-white">
+        <div className="flex h-40 items-center justify-center border border-[#D8DEE6] bg-white">
           <Loader2 className="size-5 animate-spin text-[#6B7280]" />
         </div>
       ) : generated ? (
-        <div className="overflow-hidden rounded-2xl bg-white">
-          <div className="flex items-center justify-between gap-3 border-b border-[#F0F2F5] px-6 py-4">
+        <div className="overflow-hidden border border-[#D8DEE6] bg-white">
+          <div className="flex items-center justify-between gap-3 border-b border-[#E5E7EB] px-5 py-4">
             <div>
               <p className="text-sm font-semibold text-[#1B2A41]">
                 Aguardando a vítima escanear
@@ -346,34 +345,31 @@ export function PairingQrCard({
                 Abra o app AMPARA e aponte a câmera para o código.
               </p>
             </div>
-            <div className="rounded-full bg-[#FFF7ED] px-3 py-1 text-xs font-semibold tabular-nums text-[#9A3412]">
+            <div className="bg-[#FFF7ED] px-2 py-1 text-xs font-semibold tabular-nums text-[#9A3412]">
               {countdown === "expirado" ? "Expirado" : countdown}
             </div>
           </div>
 
-          <div className="grid gap-8 px-6 py-8 lg:grid-cols-[220px_1fr] lg:items-center">
-            <div className="mx-auto w-fit rounded-2xl bg-[#F8FAFC] p-4">
+          <div className="grid gap-8 px-5 py-5 lg:grid-cols-[220px_1fr] lg:items-center">
+            <div
+              data-keep-light
+              className="mx-auto w-fit border border-[#E5E7EB] bg-white p-3"
+            >
               <QRCodeSVG value={generated.qrPayload} size={188} level="M" />
             </div>
 
-            <ol className="space-y-4">
-              {[
-                "Peça para a vítima abrir o aplicativo.",
-                "Toque em Ler QR Code e aponte a câmera.",
-                "Esta tela fecha sozinha quando o vínculo for feito.",
-              ].map((step, index) => (
-                <li key={step} className="flex gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#1B2A41] text-[11px] font-semibold text-white">
-                    {index + 1}
-                  </span>
-                  <p className="pt-0.5 text-sm leading-5 text-[#374151]">
-                    {step}
-                  </p>
-                </li>
-              ))}
-
-              <li className="flex items-center gap-2 pt-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg bg-[#F3F4F6] px-3 py-2 text-[11px] text-[#4B5563]">
+            <div>
+              <ol className="list-decimal space-y-2 pl-5 text-sm leading-5 text-[#374151]">
+                {[
+                  "Peça para a vítima abrir o aplicativo.",
+                  "Toque em Ler QR Code e aponte a câmera.",
+                  "Esta tela atualiza quando o vínculo for feito.",
+                ].map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <div className="mt-4 flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate bg-[#F3F4F6] px-3 py-2 text-[11px] text-[#4B5563]">
                   {generated.token}
                 </code>
                 <Button
@@ -385,8 +381,8 @@ export function PairingQrCard({
                 >
                   {copied === "token" ? <Check /> : <Copy />}
                 </Button>
-              </li>
-            </ol>
+              </div>
+            </div>
           </div>
 
           <div className="border-t border-[#F0F2F5] px-6 py-3">
@@ -401,39 +397,39 @@ export function PairingQrCard({
           </div>
         </div>
       ) : linkedDevice ? (
-        <div className="overflow-hidden rounded-2xl bg-white">
-          <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-6">
-            <div className="flex min-w-0 items-start gap-4">
-              <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#ECFDF3] text-[#166534]">
-                <Smartphone className="size-7" />
+        <div className="overflow-hidden border border-[#D8DEE6] bg-white">
+          <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate text-base font-semibold text-[#1B2A41]">
+                  {deviceTitle(linkedDevice)}
+                </h2>
+                <span className="bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                  Conectado
+                </span>
               </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-lg font-semibold tracking-tight text-[#1B2A41]">
-                    {deviceTitle(linkedDevice)}
-                  </h2>
-                  <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-[11px] font-semibold text-[#166534]">
-                    Conectado
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-[#6B7280]">
-                  {platformLabel(linkedDevice.platform)} · a vítima já recebe o
-                  mapa desta medida neste aparelho.
-                </p>
-              </div>
+              
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={acting}
-              className="border-[#FECACA] bg-white text-[#B42318] hover:bg-[#FEF2F2]"
-              onClick={() => void revokeDeviceAccess()}
-            >
-              Desconectar aparelho
-            </Button>
+            <div className="flex max-w-xs flex-col items-end gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={acting || disconnectBlocked}
+                className="cursor-pointer border-[#C2410C] bg-white text-[#C2410C] hover:bg-[#FFF7ED] hover:text-[#C2410C] dark:border-[#FDBA74] dark:text-[#FDBA74] dark:hover:bg-[#EA580C]/15 dark:hover:text-[#FDBA74] disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => void revokeDeviceAccess()}
+              >
+                <Smartphone data-icon="inline-start" />
+                Desconectar aparelho
+              </Button>
+              {disconnectBlocked ? (
+                <p className="text-right text-xs leading-5 text-[#9A3412]">
+                  Indisponível enquanto a violação estiver em andamento.
+                </p>
+              ) : null}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 divide-y divide-[#F0F2F5] border-t border-[#F0F2F5] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <div className="grid grid-cols-1 border-t border-[#F0F2F5] sm:grid-cols-3">
             <div className="px-6 py-4">
               <p className="text-[11px] font-medium tracking-wide text-[#9CA3AF] uppercase">
                 Sistema
@@ -442,7 +438,7 @@ export function PairingQrCard({
                 {platformLabel(linkedDevice.platform)}
               </p>
             </div>
-            <div className="px-6 py-4">
+            <div className="border-t border-[#F0F2F5] px-6 py-4 sm:border-t-0 sm:border-l">
               <p className="text-[11px] font-medium tracking-wide text-[#9CA3AF] uppercase">
                 Vinculado em
               </p>
@@ -450,7 +446,7 @@ export function PairingQrCard({
                 {formatDateTime(linkedDevice.pairedAt)}
               </p>
             </div>
-            <div className="px-6 py-4">
+            <div className="border-t border-[#F0F2F5] px-6 py-4 sm:border-t-0 sm:border-l">
               <p className="text-[11px] font-medium tracking-wide text-[#9CA3AF] uppercase">
                 Último sinal
               </p>
@@ -461,21 +457,17 @@ export function PairingQrCard({
           </div>
         </div>
       ) : (
-        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center">
-          <div className="mb-5 flex size-16 items-center justify-center rounded-2xl bg-[#F3F4F6] text-[#1B2A41]">
-            <Smartphone className="size-8" />
-          </div>
-          <h2 className="text-lg font-semibold tracking-tight text-[#1B2A41]">
-            Vincular o celular da vítima
+        <div className="border border-[#D8DEE6] bg-white px-5 py-5">
+          <h2 className="text-base font-semibold text-[#1B2A41]">
+            Celular da vítima
           </h2>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-[#6B7280]">
-            Gere um QR Code, peça para a vítima escanear no aplicativo e o
-            monitoramento começa na hora.
+          <p className="mt-1 max-w-lg text-sm leading-6 text-[#4B5563]">
+            Gere um QR Code para a vítima escanear no aplicativo.
           </p>
           <Button
             type="button"
             disabled={acting}
-            className="mt-6 cursor-pointer bg-[#1B2A41] px-5 text-white hover:bg-[#24364f]"
+            className="ampara-create mt-4 cursor-pointer px-5"
             onClick={() => void generate()}
           >
             {acting ? (
@@ -497,7 +489,7 @@ export function PairingQrCard({
             {previousDevices.map((device) => (
               <div
                 key={device.publicId}
-                className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3"
+                className="flex items-center justify-between gap-3 border border-[#D8DEE6] bg-white px-4 py-3"
               >
                 <p className="truncate text-sm text-[#4B5563]">
                   {deviceTitle(device)}
