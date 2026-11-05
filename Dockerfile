@@ -5,6 +5,7 @@ WORKDIR /usr/src/app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
+COPY src/lib/database-url.ts ./src/lib/database-url.ts
 
 RUN npm ci
 

@@ -25,5 +25,5 @@ export function resolveDatabaseUrl(
   }
 
   const host = banco.includes(":") ? banco : `${banco}:5432`;
-  return `postgresql://${encodeUserInfo(usuario)}:${encodeUserInfo(senha)}@${host}/${nome}?schema=public&sslmode=require`;
+  return `postgresql://${encodeUserInfo(usuario)}:${encodeUserInfo(senha)}@${host}/${nome}?schema=public&sslmode=disable`;
 }
