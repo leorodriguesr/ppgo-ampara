@@ -52,10 +52,35 @@ function createPrismaClient() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+let cachedClient: PrismaClient | undefined;
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function getPrismaClient() {
+  if (process.env.NODE_ENV !== "production" && globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
+
+  if (cachedClient) return cachedClient;
+
+  cachedClient = createPrismaClient();
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = cachedClient;
+  }
+
+  return cachedClient;
 }
+
+// O next build importa as rotas sem banco. A conexão só abre no primeiro uso.
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    if (prop === "then" || prop === "catch" || prop === "finally") {
+      return undefined;
+    }
+
+    const client = getPrismaClient();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 export default prisma;
