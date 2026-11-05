@@ -6,6 +6,17 @@ import {
 } from "@/lib/sso/session-cookie";
 import { validateSsoTokenAndSyncUser } from "@/lib/sso/validate-server";
 
+function publicFailureDetail(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const message = error.message;
+
+  if (message === "DATABASE_URL is not set") return message;
+  if (/^SSO validate falhou \(\d+\)$/.test(message)) return message;
+  if (message.startsWith("Invalid environment variables:")) return message;
+
+  return undefined;
+}
+
 function isDatabaseUnavailable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
 
@@ -20,7 +31,7 @@ function isDatabaseUnavailable(error: unknown): boolean {
 
   return (
     typeof candidate.message === "string" &&
-    /ECONNREFUSED|Can't reach database|Connection refused/i.test(
+    /ECONNREFUSED|Can't reach database|Connection refused|DATABASE_URL is not set/i.test(
       candidate.message,
     )
   );
@@ -82,6 +93,7 @@ export async function POST(request: NextRequest) {
       {
         code: "SSO_VALIDATE_FAILED",
         message: "Não foi possível validar o token SSO.",
+        detail: publicFailureDetail(error),
       },
       { status: 401 },
     );

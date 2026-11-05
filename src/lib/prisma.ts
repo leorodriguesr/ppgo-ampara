@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+import { resolveDatabaseUrl } from "@/lib/database-url";
 import { PrismaClient } from "@/generated/prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
@@ -36,7 +37,7 @@ if (globalForPrisma.pgPoolVersion !== POOL_VERSION) {
 }
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = resolveDatabaseUrl();
 
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
