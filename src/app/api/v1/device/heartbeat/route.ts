@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     });
     await touchProtectionOrderContact(device.protectionOrderId, {
       lastContactAt: now,
-      ...(body.gpsOk ? { lastGpsAt: now } : {}),
+      lastGpsAt: body.gpsOk ? now : null,
     });
 
     return jsonOk({ ok: true, serverTime: now.toISOString() });

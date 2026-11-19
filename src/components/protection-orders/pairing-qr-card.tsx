@@ -448,7 +448,7 @@ export function PairingQrCard({
             </div>
             <div className="border-t border-[#F0F2F5] px-6 py-4 sm:border-t-0 sm:border-l">
               <p className="text-[11px] font-medium tracking-wide text-[#9CA3AF] uppercase">
-                Último sinal
+                Último contato
               </p>
               <p className="mt-1 text-sm font-medium text-[#1B2A41]">
                 {formatLastSeen(linkedDevice.lastSeenAt)}

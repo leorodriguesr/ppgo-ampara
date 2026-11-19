@@ -10,7 +10,10 @@ import {
   ListSearchField,
   ListSearchSubmit,
 } from "@/components/layout/list-search";
-import { DeviceLinkBadge } from "@/components/protection-orders/device-link-badge";
+import {
+  DeviceLinkBadge,
+  DeviceLinkColumnInfo,
+} from "@/components/protection-orders/device-link-badge";
 import { OrderConnectDialog } from "@/components/protection-orders/order-connect-dialog";
 import { ProtectionOrderForm } from "@/components/protection-orders/protection-order-form";
 import { ProtectionOrderStatusBadge } from "@/components/protection-orders/status-badge";
@@ -252,8 +255,13 @@ export function ProtectionOrdersList() {
                   <th className="py-2.5 pr-4 font-semibold">Preso</th>
                   <th className="py-2.5 pr-4 font-semibold">Raio de Proteção</th>
                   <th className="py-2.5 pr-4 font-semibold">Status</th>
-                  <th className="py-2.5 pr-4 font-semibold">Aparelho</th>
                   <th className="py-2.5 pr-3 font-semibold">Vigência</th>
+                  <th className="py-2.5 pr-4 font-semibold">
+                    <span className="inline-flex items-center gap-1">
+                      Aparelho
+                      <DeviceLinkColumnInfo />
+                    </span>
+                  </th>
                   <th className="w-28 py-2.5 pr-2 pl-1 font-semibold" />
                 </tr>
               </thead>
@@ -282,13 +290,13 @@ export function ProtectionOrdersList() {
                     <td className="py-3 pr-4">
                       <ProtectionOrderStatusBadge status={order.status} plain />
                     </td>
-                    <td className="py-3 pr-4">
-                      <DeviceLinkBadge link={order.deviceLink ?? null} />
-                    </td>
                     <td className="py-3 pr-3 font-normal text-[#1B2A41]">
                       {order.startsAt || order.endsAt
                         ? `${order.startsAt ? formatDay(order.startsAt) : "—"} - ${order.endsAt ? formatDay(order.endsAt) : "—"}`
                         : "—"}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <DeviceLinkBadge link={order.deviceLink ?? null} />
                     </td>
                     <td className="w-28 py-3 pr-2 pl-1">
                       <div className="flex items-center justify-end gap-1">

@@ -37,34 +37,53 @@ const DEVICE_LINK_COPY: Record<
   },
 };
 
+const DEVICE_LINK_ORDER: DeviceLink[] = [
+  "paired",
+  "unpaired",
+  "no_signal",
+  "no_position",
+  "no_background",
+];
+
 export function DeviceLinkBadge({ link }: { link: DeviceLink | null }) {
   if (!link) return <span className="text-[#9CA3AF]">—</span>;
 
   const copy = DEVICE_LINK_COPY[link];
-  return (
-    <span className={`inline-flex items-center gap-1 font-medium ${copy.className}`}>
-      <DeviceLinkInfo text={copy.hint} label={copy.label} />
-      {copy.label}
-    </span>
-  );
+  return <span className={`font-medium ${copy.className}`}>{copy.label}</span>;
 }
 
-function DeviceLinkInfo({ text, label }: { text: string; label: string }) {
+export function DeviceLinkColumnInfo() {
   const tipId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function place() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const width = 288;
+    const width = 320;
     const left = Math.min(
       Math.max(8, rect.left),
       window.innerWidth - width - 8,
     );
     setBox({ top: rect.bottom + 6, left });
+  }
+
+  function cancelClose() {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function scheduleClose() {
+    cancelClose();
+    closeTimer.current = setTimeout(() => {
+      if (!pinned) setOpen(false);
+    }, 120);
   }
 
   useEffect(() => {
@@ -73,12 +92,15 @@ function DeviceLinkInfo({ text, label }: { text: string; label: string }) {
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (buttonRef.current?.contains(target)) return;
+      if (tipRef.current?.contains(target)) return;
       setPinned(false);
       setOpen(false);
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [pinned]);
+
+  useEffect(() => () => cancelClose(), []);
 
   const visible = open || pinned;
 
@@ -87,14 +109,15 @@ function DeviceLinkInfo({ text, label }: { text: string; label: string }) {
       <button
         ref={buttonRef}
         type="button"
-        aria-label={`O que significa ${label}`}
+        aria-label="O que significa cada status do aparelho"
         aria-describedby={visible ? tipId : undefined}
         className="inline-flex cursor-pointer text-current/80 hover:text-current"
         onMouseEnter={() => {
+          cancelClose();
           place();
           setOpen(true);
         }}
-        onMouseLeave={() => setOpen(false)}
+        onMouseLeave={scheduleClose}
         onFocus={() => {
           place();
           setOpen(true);
@@ -112,14 +135,29 @@ function DeviceLinkInfo({ text, label }: { text: string; label: string }) {
       </button>
       {visible && box
         ? createPortal(
-            <span
+            <div
+              ref={tipRef}
               id={tipId}
               role="tooltip"
               style={{ top: box.top, left: box.left }}
-              className="fixed z-50 w-72 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-left text-xs leading-relaxed font-normal whitespace-normal text-[#1B2A41] shadow-lg dark:border-white/10 dark:bg-[#1B2433] dark:text-white"
+              className="fixed z-50 w-80 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-left text-xs leading-relaxed font-normal whitespace-normal text-[#1B2A41] shadow-lg dark:border-white/10 dark:bg-[#1B2433] dark:text-white"
+              onMouseEnter={cancelClose}
+              onMouseLeave={scheduleClose}
             >
-              {text}
-            </span>,
+              <ul className="space-y-2">
+                {DEVICE_LINK_ORDER.map((key) => {
+                  const copy = DEVICE_LINK_COPY[key];
+                  return (
+                    <li key={key}>
+                      <span className={`font-medium ${copy.className}`}>
+                        {copy.label}.
+                      </span>{" "}
+                      {copy.hint}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>,
             document.body,
           )
         : null}

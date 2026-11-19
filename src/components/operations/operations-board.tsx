@@ -553,9 +553,15 @@ function signalLabel(track: OperationsTrack) {
 }
 
 function marginLabel(track: OperationsTrack) {
-  if (track.signal === "no_signal") return "O aparelho parou de chamar";
-  if (track.signal === "stale_gps") return "A API responde, o GPS não";
-  if (track.signal === "no_background") return "Permissão de segundo plano negada";
+  if (track.signal === "no_signal") {
+    return "O celular da vítima parou de se comunicar. Pode estar sem internet ou desligado. Entre em contato com ela e peça para ligar o aparelho e a internet.";
+  }
+  if (track.signal === "stale_gps") {
+    return "O celular da vítima está sem localização. Ligue para ela e peça para ligar a localização do celular.";
+  }
+  if (track.signal === "no_background") {
+    return "O celular da vítima não pode usar a localização com a tela bloqueada. Ligue para ela e peça para abrir o Ampara e permitir a localização o tempo todo.";
+  }
   if (track.lastDistanceM == null) return "Sem posição recente do preso";
   const distance = Math.round(track.lastDistanceM);
   if (track.zone === "violation") {

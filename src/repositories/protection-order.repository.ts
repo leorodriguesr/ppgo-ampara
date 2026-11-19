@@ -223,7 +223,7 @@ export async function updateProtectionOrderGeofence(
 
 export async function touchProtectionOrderContact(
   id: string,
-  data: { lastContactAt: Date; lastGpsAt?: Date },
+  data: { lastContactAt: Date; lastGpsAt?: Date | null },
 ) {
   return prisma.protectionOrder.update({
     where: { id },
