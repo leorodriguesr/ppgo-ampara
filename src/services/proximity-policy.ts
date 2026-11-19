@@ -10,10 +10,10 @@ export type OperationsZone = "violation" | "watch" | "clear";
 
 /** Metas de consulta. O sistema operacional pode atrasar a tarefa. */
 export const monitoringIntervals = {
-  outOfWindowSeconds: 30,
-  inListSeconds: 10,
+  farSeconds: 45,
+  watchSeconds: 15,
   violationSeconds: 5,
-  failedSeconds: 10,
+  failedSeconds: 45,
 } as const;
 
 const STALE_FIX_MS = 2 * 60 * 1000;
@@ -44,9 +44,9 @@ export function stateAfterAbsence(current: GeofenceState): GeofenceState {
 
 export function intervalAfterAbsence(current: GeofenceState) {
   if (current === "VIOLATING" || current === "PENDING_SAFE") {
-    return monitoringIntervals.inListSeconds;
+    return monitoringIntervals.violationSeconds;
   }
-  return monitoringIntervals.outOfWindowSeconds;
+  return monitoringIntervals.farSeconds;
 }
 
 export function intervalAfterFailure() {
@@ -65,8 +65,8 @@ export function intervalAfterFix(
   ) {
     return monitoringIntervals.violationSeconds;
   }
-  if (distanceMeters <= watchRadiusMeters) return monitoringIntervals.inListSeconds;
-  return monitoringIntervals.inListSeconds;
+  if (distanceMeters <= watchRadiusMeters) return monitoringIntervals.watchSeconds;
+  return monitoringIntervals.farSeconds;
 }
 
 export function shouldPersistVictimFix(
@@ -121,8 +121,8 @@ export function decideFoundGeofence(input: {
 
 export function expectedIntervalSeconds(zone: OperationsZone) {
   if (zone === "violation") return monitoringIntervals.violationSeconds;
-  if (zone === "watch") return monitoringIntervals.inListSeconds;
-  return monitoringIntervals.outOfWindowSeconds;
+  if (zone === "watch") return monitoringIntervals.watchSeconds;
+  return monitoringIntervals.farSeconds;
 }
 
 export function assessDeviceSignal(input: {
@@ -145,6 +145,63 @@ export function assessDeviceSignal(input: {
     : Number.POSITIVE_INFINITY;
   if (gpsAge > STALE_GPS_MS) return "stale_gps";
   return "ok";
+}
+
+export type DeviceLink =
+  | "paired"
+  | "unpaired"
+  | "no_signal"
+  | "no_position"
+  | "no_background";
+
+export type AlertBlock = "unpaired" | "no_signal" | "no_position";
+
+/** Situação do aparelho numa medida já ativa. */
+export function deviceLinkForActiveOrder(input: {
+  hasActiveDevice: boolean;
+  now: Date;
+  lastContactAt: Date | null;
+  lastGpsAt: Date | null;
+  expectedSeconds: number;
+  backgroundEnabled: boolean | null;
+}): DeviceLink {
+  if (!input.hasActiveDevice) return "unpaired";
+  const signal = assessDeviceSignal(input);
+  if (signal === "no_signal") return "no_signal";
+  if (signal === "stale_gps") return "no_position";
+  if (signal === "no_background") return "no_background";
+  return "paired";
+}
+
+/**
+ * Alerta novo só com aparelho pareado, contato recente e GPS recente.
+ * Permissão de segundo plano não entra: a posição atual é o que vale.
+ */
+export function alertBlockReason(input: {
+  hasActiveDevice: boolean;
+  now: Date;
+  lastContactAt: Date | null;
+  lastGpsAt: Date | null;
+  expectedSeconds: number;
+}): AlertBlock | null {
+  if (!input.hasActiveDevice) return "unpaired";
+  const signal = assessDeviceSignal({
+    ...input,
+    backgroundEnabled: null,
+  });
+  if (signal === "no_signal") return "no_signal";
+  if (signal === "stale_gps") return "no_position";
+  return null;
+}
+
+export function alertBlockMessage(block: AlertBlock) {
+  if (block === "unpaired") {
+    return "Não há aparelho pareado. O alerta não é gerado.";
+  }
+  if (block === "no_signal") {
+    return "O aparelho está sem sinal. A última posição não gera alerta.";
+  }
+  return "O aparelho está sem posição atual. A última coordenada não gera alerta.";
 }
 
 export function zoneFromLookup(input: {

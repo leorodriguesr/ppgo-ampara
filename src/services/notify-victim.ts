@@ -29,7 +29,7 @@ export async function notifyVictimOfViolation(params: {
     devices.map((device) =>
       sendExpoPushNotification(device.pushToken, {
         title: "Violação da medida protetiva",
-        body: `Procure um lugar seguro. A Polícia Penal já está a caminho.${distance}`,
+        body: `Procure um lugar seguro.${distance}`,
         data: {
           type: "VIOLATION",
           screen: "map",

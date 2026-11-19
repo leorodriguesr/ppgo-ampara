@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { MapPin, Phone } from "lucide-react";
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { geofenceConfig } from "@/config/geofence";
+import { monitoringIntervals } from "@/services/proximity-policy";
 import { cn } from "@/lib/utils";
 import type { OperationsPoint, OperationsTrack } from "@/types/operations";
 
@@ -25,16 +25,15 @@ function formatDistance(meters: number | null) {
 }
 
 function caseRefreshMs(track: OperationsTrack | null) {
-  if (track?.zone === "violation") {
-    return geofenceConfig.intervals.liveViolationSeconds * 1000;
-  }
   if (
+    track?.zone === "violation" ||
     track?.geofenceState === "PENDING_VIOLATION" ||
     track?.geofenceState === "PENDING_SAFE"
   ) {
-    return geofenceConfig.intervals.liveViolatingSeconds * 1000;
+    return monitoringIntervals.violationSeconds * 1000;
   }
-  return geofenceConfig.intervals.liveSeconds * 1000;
+  if (track?.zone === "watch") return monitoringIntervals.watchSeconds * 1000;
+  return monitoringIntervals.farSeconds * 1000;
 }
 
 function situation(track: OperationsTrack) {

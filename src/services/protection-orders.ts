@@ -17,12 +17,18 @@ import {
   updateProtectionOrderStatus,
   type ProtectionOrderListParams,
 } from "@/repositories/protection-order.repository";
+import { listActiveDeviceSignals } from "@/repositories/device.repository";
 import { findVictimById } from "@/repositories/victim.repository";
 import {
   ensureProtectionOrderNotExpired,
   expireDueProtectionOrders,
   isViolationOpen,
 } from "@/services/protection-order-expiry";
+import {
+  deviceLinkForActiveOrder,
+  expectedIntervalSeconds,
+  zoneFromLookup,
+} from "@/services/proximity-policy";
 import { writeAuditLog } from "@/services/write-audit-log";
 import type { ProtectionOrderStatus } from "@/generated/prisma/client";
 
@@ -342,7 +348,46 @@ export async function listProtectionOrdersService(
   params: ProtectionOrderListParams,
 ) {
   await expireDueProtectionOrders();
-  return listProtectionOrders(params);
+  const result = await listProtectionOrders(params);
+  const devices = await listActiveDeviceSignals(result.data.map((order) => order.id));
+  const activeByOrder = new Map<
+    string,
+    { lastSeenAt: Date | null; backgroundEnabled: boolean | null }
+  >();
+  for (const device of devices) {
+    if (!activeByOrder.has(device.protectionOrderId)) {
+      activeByOrder.set(device.protectionOrderId, device);
+    }
+  }
+
+  const now = new Date();
+  return {
+    ...result,
+    data: result.data.map((order) => {
+      if (order.status !== "ACTIVE") {
+        return { ...order, deviceLink: null };
+      }
+      const device = activeByOrder.get(order.id) ?? null;
+      const zone = zoneFromLookup({
+        lookupStatus: order.lookupStatus,
+        geofenceState: order.geofenceState,
+        distanceMeters: order.lastDistanceM,
+        radiusMeters: order.radiusMeters,
+        watchRadiusMeters: order.watchRadiusMeters,
+      });
+      return {
+        ...order,
+        deviceLink: deviceLinkForActiveOrder({
+          hasActiveDevice: Boolean(device),
+          now,
+          lastContactAt: order.lastContactAt ?? device?.lastSeenAt ?? null,
+          lastGpsAt: order.lastGpsAt,
+          expectedSeconds: expectedIntervalSeconds(zone),
+          backgroundEnabled: device?.backgroundEnabled ?? null,
+        }),
+      };
+    }),
+  };
 }
 
 export async function deleteProtectionOrderService(id: string) {

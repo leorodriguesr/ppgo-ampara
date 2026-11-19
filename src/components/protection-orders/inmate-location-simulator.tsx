@@ -335,12 +335,6 @@ export function InmateLocationSimulator({
 
     try {
       const victim = await fetchLastVictimFromApp();
-      if (!victim) {
-        setError(
-          "Ainda não há localização do app. Abra o mapa no celular e aguarde um ciclo.",
-        );
-        return;
-      }
       let result: Awaited<ReturnType<typeof placeInmateAt>>;
 
       switch (scenario) {
@@ -394,13 +388,19 @@ export function InmateLocationSimulator({
   async function fetchLastVictimFromApp(): Promise<{
     latitude: number;
     longitude: number;
-  } | null> {
+  }> {
     const res = await fetch(
       `/api/v1/protection-orders/${orderId}/last-victim-location`,
       { credentials: "include" },
     );
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.location) return null;
+    if (!res.ok || !data.location) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Ainda não há localização do app. Abra o mapa no celular e aguarde um ciclo.",
+      );
+    }
     setVictimLat(String(data.location.latitude));
     setVictimLng(String(data.location.longitude));
     return {
@@ -414,22 +414,20 @@ export function InmateLocationSimulator({
     setMessage(null);
     try {
       const location = await fetchLastVictimFromApp();
-      if (!location) {
-        setError(
-          "Ainda não há localização do app. Abra o mapa no celular e aguarde um ciclo.",
-        );
-        return;
-      }
       setMessage(
-        `Referência atualizada pela última posição do app (${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`,
+        `Referência atualizada pela posição atual do app (${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`,
       );
-    } catch {
-      setError("Falha de comunicação ao buscar posição do app");
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Falha de comunicação ao buscar posição do app",
+      );
     }
   }
 
   useEffect(() => {
-    void fetchLastVictimFromApp();
+    void fetchLastVictimFromApp().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- uma vez ao abrir o simulador
   }, [orderId]);
 

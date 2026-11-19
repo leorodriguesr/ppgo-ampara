@@ -6,6 +6,8 @@ import {
 import { NotFoundError } from "@/lib/errors";
 import { findProtectionOrderById } from "@/repositories/protection-order.repository";
 import { findLatestVictimLocation } from "@/repositories/victim-location.repository";
+import { liveFixBlockForOrder } from "@/services/proximity";
+import { alertBlockMessage } from "@/services/proximity-policy";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -19,6 +21,14 @@ export async function GET(_request: Request, context: RouteContext) {
     const order = await findProtectionOrderById(id);
     if (!order) {
       throw new NotFoundError("Medida protetiva não encontrada");
+    }
+
+    const block = await liveFixBlockForOrder(order);
+    if (block) {
+      return jsonOk({
+        location: null,
+        message: alertBlockMessage(block),
+      });
     }
 
     if (

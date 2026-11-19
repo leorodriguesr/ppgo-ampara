@@ -7,7 +7,10 @@ import {
   localizarDetento,
 } from "@/integrations/ankle-monitor";
 import { AppError, NotFoundError } from "@/lib/errors";
-import type { ActiveDeviceWithOrder } from "@/repositories/device.repository";
+import {
+  findActiveDeviceSignal,
+  type ActiveDeviceWithOrder,
+} from "@/repositories/device.repository";
 import {
   createAlert,
   findOpenAlertByOrderId,
@@ -23,11 +26,15 @@ import { createVictimLocation } from "@/repositories/victim-location.repository"
 import { notifyVictimOfViolation } from "@/services/notify-victim";
 import { ensureProtectionOrderNotExpired } from "@/services/protection-order-expiry";
 import {
+  alertBlockMessage,
+  alertBlockReason,
   decideFoundGeofence,
+  expectedIntervalSeconds,
   intervalAfterAbsence,
   intervalAfterFailure,
   isVictimFixStale,
   stateAfterAbsence,
+  zoneFromLookup,
 } from "@/services/proximity-policy";
 import { recordTrackingPoint } from "@/services/tracking";
 import { writeAuditLog } from "@/services/write-audit-log";
@@ -578,6 +585,34 @@ export async function checkProximityService(params: {
 /**
  * Mesmo motor de proximidade, autenticado como polícia (teste no painel).
  */
+export async function liveFixBlockForOrder(order: {
+  id: string;
+  lastContactAt: Date | null;
+  lastGpsAt: Date | null;
+  lookupStatus: ProximityCheckResponse["lookupStatus"];
+  geofenceState: GeofenceState;
+  lastDistanceM: number | null;
+  radiusMeters: number;
+  watchRadiusMeters: number;
+}) {
+  const device = await findActiveDeviceSignal(order.id);
+  const zone = zoneFromLookup({
+    lookupStatus: order.lookupStatus,
+    geofenceState: order.geofenceState,
+    distanceMeters: order.lastDistanceM,
+    radiusMeters: order.radiusMeters,
+    watchRadiusMeters: order.watchRadiusMeters,
+  });
+
+  return alertBlockReason({
+    hasActiveDevice: Boolean(device),
+    now: new Date(),
+    lastContactAt: order.lastContactAt ?? device?.lastSeenAt ?? null,
+    lastGpsAt: order.lastGpsAt,
+    expectedSeconds: expectedIntervalSeconds(zone),
+  });
+}
+
 export async function checkProximityForOrderAsPolice(
   orderId: string,
   coords: ProximityCoords,
@@ -587,6 +622,11 @@ export async function checkProximityForOrderAsPolice(
   const order = await findProtectionOrderById(orderId);
   if (!order) {
     throw new NotFoundError("Medida protetiva não encontrada");
+  }
+
+  const block = await liveFixBlockForOrder(order);
+  if (block) {
+    throw new AppError("APP_NOT_READY", alertBlockMessage(block), 409);
   }
 
   return runProximityEngine({

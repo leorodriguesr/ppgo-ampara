@@ -10,9 +10,11 @@ import {
   ListSearchField,
   ListSearchSubmit,
 } from "@/components/layout/list-search";
+import { DeviceLinkBadge } from "@/components/protection-orders/device-link-badge";
 import { OrderConnectDialog } from "@/components/protection-orders/order-connect-dialog";
 import { ProtectionOrderForm } from "@/components/protection-orders/protection-order-form";
 import { ProtectionOrderStatusBadge } from "@/components/protection-orders/status-badge";
+import type { DeviceLink } from "@/services/proximity-policy";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
@@ -35,6 +37,7 @@ type OrderRow = {
   startsAt: string | null;
   endsAt: string | null;
   createdAt: string;
+  deviceLink?: DeviceLink | null;
   victim?: { fullName: string } | null;
   inmate?: { fullName: string } | null;
 };
@@ -241,7 +244,7 @@ export function ProtectionOrdersList() {
 
         {!loading && result && result.data.length > 0 ? (
           <div className="overflow-x-auto rounded-xl">
-            <table className="w-full min-w-[860px] text-left text-sm whitespace-nowrap">
+            <table className="w-full min-w-[1040px] text-left text-sm whitespace-nowrap">
               <thead className="ampara-thead text-sm font-semibold">
                 <tr>
                   <th className="py-2.5 pr-4 pl-3 font-semibold">Processo</th>
@@ -249,6 +252,7 @@ export function ProtectionOrdersList() {
                   <th className="py-2.5 pr-4 font-semibold">Preso</th>
                   <th className="py-2.5 pr-4 font-semibold">Raio de Proteção</th>
                   <th className="py-2.5 pr-4 font-semibold">Status</th>
+                  <th className="py-2.5 pr-4 font-semibold">Aparelho</th>
                   <th className="py-2.5 pr-3 font-semibold">Vigência</th>
                   <th className="w-28 py-2.5 pr-2 pl-1 font-semibold" />
                 </tr>
@@ -277,6 +281,9 @@ export function ProtectionOrdersList() {
                     </td>
                     <td className="py-3 pr-4">
                       <ProtectionOrderStatusBadge status={order.status} plain />
+                    </td>
+                    <td className="py-3 pr-4">
+                      <DeviceLinkBadge link={order.deviceLink ?? null} />
                     </td>
                     <td className="py-3 pr-3 font-normal text-[#1B2A41]">
                       {order.startsAt || order.endsAt

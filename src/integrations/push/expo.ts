@@ -33,7 +33,7 @@ export async function sendExpoPushNotification(
     data: payload.data,
     sound: "default",
     priority: "high",
-    channelId: "violations",
+    channelId: "ampara-alarm",
     interruptionLevel: "timeSensitive",
   };
 

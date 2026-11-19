@@ -8,7 +8,7 @@ import { ArrowUpRight, MapPin, Menu, Phone } from "lucide-react";
 import { PoliciaPenalMark } from "@/components/brand/policia-penal-mark";
 import { useOpenMapMenu } from "@/components/layout/map-chrome";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { geofenceConfig } from "@/config/geofence";
+import { monitoringIntervals } from "@/services/proximity-policy";
 import type { OperationsPoint, OperationsTrack } from "@/types/operations";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -75,6 +75,23 @@ function useMapPadding() {
     };
 }
 
+function boardRefreshMs(tracks: OperationsTrack[] | undefined) {
+  if (
+    tracks?.some(
+      (track) =>
+        track.zone === "violation" ||
+        track.geofenceState === "PENDING_VIOLATION" ||
+        track.geofenceState === "PENDING_SAFE",
+    )
+  ) {
+    return monitoringIntervals.violationSeconds * 1000;
+  }
+  if (tracks?.some((track) => track.zone === "watch")) {
+    return monitoringIntervals.watchSeconds * 1000;
+  }
+  return monitoringIntervals.farSeconds * 1000;
+}
+
 export function OperationsBoard() {
   const { authData } = useAuth();
   const user = authData.user;
@@ -89,7 +106,7 @@ export function OperationsBoard() {
   const [freshViolations, setFreshViolations] = useState<OperationsTrack[]>([]);
   const knownViolations = useRef<Set<string> | null>(null);
   const clock = useClock();
-  const refreshMs = geofenceConfig.intervals.liveSeconds * 1000;
+  const refreshMs = boardRefreshMs(board?.tracks);
 
   useEffect(() => {
     document.title = "Ampara - Acompanhamento Geral";

@@ -139,6 +139,30 @@ export async function updateDevicePushToken(id: string, pushToken: string) {
   });
 }
 
+export async function findActiveDeviceSignal(protectionOrderId: string) {
+  return prisma.device.findFirst({
+    where: { protectionOrderId, status: "ACTIVE" },
+    orderBy: { lastSeenAt: "desc" },
+    select: { lastSeenAt: true, backgroundEnabled: true },
+  });
+}
+
+export async function listActiveDeviceSignals(protectionOrderIds: string[]) {
+  if (protectionOrderIds.length === 0) return [];
+  return prisma.device.findMany({
+    where: {
+      protectionOrderId: { in: protectionOrderIds },
+      status: "ACTIVE",
+    },
+    orderBy: { lastSeenAt: "desc" },
+    select: {
+      protectionOrderId: true,
+      lastSeenAt: true,
+      backgroundEnabled: true,
+    },
+  });
+}
+
 export async function listActiveDevicesWithPushToken(protectionOrderId: string) {
   const devices = await prisma.device.findMany({
     where: {
